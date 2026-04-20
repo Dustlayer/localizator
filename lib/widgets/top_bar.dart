@@ -78,6 +78,13 @@ class _TopBarState extends ConsumerState<TopBar> {
     }
   }
 
+  void _handleSaveToFiles() {
+    final localizationProject = ref.read(localizationProjectStateProvider).value;
+    if (localizationProject == null || localizationProject.isDirty != true) return;
+
+    ref.read(localizationProjectStateProvider.notifier).saveToFiles();
+  }
+
   @override
   Widget build(BuildContext context) {
     final appConfig = ref.watch(appConfigStateProvider).value;
@@ -85,10 +92,7 @@ class _TopBarState extends ConsumerState<TopBar> {
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-          final localizationProject = ref.read(localizationProjectStateProvider).value;
-          if (localizationProject == null || localizationProject.isDirty != true) return;
-
-          ref.read(localizationProjectStateProvider.notifier).saveToFiles();
+          _handleSaveToFiles();
         },
       },
       child: Scaffold(
@@ -99,15 +103,20 @@ class _TopBarState extends ConsumerState<TopBar> {
               builder: (context, ref, child) {
                 final localizationProject = ref.watch(localizationProjectStateProvider).value;
                 if (localizationProject?.isDirty != true) return SizedBox();
-
-                return Align(
-                  alignment: .centerLeft,
-                  child: Card(
-                    borderColor: Colors.yellow.shade600,
-                    child: Text(
-                      "Muss gespeichert werden",
-                      overflow: .ellipsis,
-                      style: TextStyle(color: Colors.yellow.shade600, fontSize: 14),
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _handleSaveToFiles,
+                    child: Align(
+                      alignment: .centerLeft,
+                      child: Card(
+                        borderColor: Colors.yellow.shade600,
+                        child: Text(
+                          "Muss gespeichert werden",
+                          overflow: .ellipsis,
+                          style: TextStyle(color: Colors.yellow.shade600, fontSize: 14),
+                        ),
+                      ),
                     ),
                   ),
                 );

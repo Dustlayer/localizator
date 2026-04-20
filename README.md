@@ -1,17 +1,21 @@
 # localizator
 
-A new Flutter project.
+A desktop app that helps editing localization JSON files. Currently only available in German.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Manage projects with multiple json files
+- Each json file maps to one language
+- See which keys are missing a translation
+- Edit translations
+- Add new keys
+- Save to files by click top left or [Meta + s] / [Command + s]
 
-A few resources to get you started if this is your first Flutter project:
+# Build
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+In order to build it you'll need the Flutter toolchain installed.
+I developed and use it on MacOS, but in theory it should run on Windows & Linux as well.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# MacOS specifics
+
+Localizator does _NOT_ use the MacOS Sandbox currently. It could be implemented though as `desktop_drop` implements passing the [bookmark information](https://pub.dev/documentation/desktop_drop/latest/desktop_drop/DropItem-class.html).
