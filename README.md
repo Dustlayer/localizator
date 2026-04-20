@@ -2,6 +2,8 @@
 
 A desktop app that helps editing localization JSON files. Currently only available in German.
 
+![demo](./demo.gif)
+
 ## Features
 
 - Manage projects with multiple json files
