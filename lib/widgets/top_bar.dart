@@ -148,7 +148,7 @@ class _TopBarState extends ConsumerState<TopBar> {
                 tooltip: (context) =>
                     TooltipContainer(child: const Text("Gesamte App-Config löschen")),
                 child: IconButton.destructive(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.settings, color: Colors.red),
                   onPressed: () async {
                     // delete config
                     await AppConfig.delete();

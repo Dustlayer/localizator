@@ -4,14 +4,22 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:localizator/model/translation_locale.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
+import '../constants.dart';
+
 class TranslationKey {
   const TranslationKey(this.keyParts);
   final IList<String> keyParts;
 
   String get key => keyParts.join('.');
 
+  TranslationKey get parent => TranslationKey(keyParts.sublist(0, keyParts.length - 1));
+
   factory TranslationKey.fromKey(String key) {
     return TranslationKey(key.split('.').toIList());
+  }
+
+  TranslationKey withAddedKeyParts(IList<String> parts) {
+    return TranslationKey(keyParts.addAll(parts));
   }
 
   @override
@@ -132,8 +140,8 @@ extension LocalizationExporter on LocalizationProject {
       final translation = translations[translationKey];
       final value = translation?.translations[locale];
 
-      // Skip if this specific language doesn't have a value for this key
-      if (value == null) continue;
+      // Skip if this specific language doesn't have a value for this key or it's empty
+      if (value == null || value.trim().isEmpty) continue;
 
       _assignNested(root, translationKey.keyParts, value, sortByAlphabet);
     }
@@ -174,13 +182,27 @@ extension LocalizationExporter on LocalizationProject {
 }
 
 class TranslationKeyTreeNode {
-  const TranslationKeyTreeNode({required this.translationKey, required this.hasAllKeys});
+  const TranslationKeyTreeNode({
+    required this.translationKey,
+    required this.hasAllKeys,
+    this.isAddingKey = false,
+  });
+
   final TranslationKey translationKey;
+
+  /// Shows whether this entry (or any of its children) has a key with content for each language defined.
+  /// If false, it will be shown as red to notify for empty translations.
   final bool hasAllKeys;
+
+  /// Signals that this is a "virtual node" and a key is being added using this node.
+  /// A TextField should be displayed so the user can input a new translation key.
+  final bool isAddingKey;
 }
 
 extension LocalizationTree on LocalizationProject {
-  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes() {
+  /// [keysBeingAdded] contains a Set of keys. "Underneath" / Inside of each key there should be
+  /// "virtual" node with an input field, where the user can input a new node.
+  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes(ISet<TranslationKey> keysBeingAdded) {
     // Build a nested helper map
     // String (part) -> Map (children) OR TranslationKey (leaf)
     final Map<String, dynamic> structure = {};
@@ -203,41 +225,18 @@ extension LocalizationTree on LocalizationProject {
     }
 
     // Recursively convert the map to TreeViewNodes
-    return _mapToNodes(structure);
+    return _mapToNodes(structure, keysBeingAdded, const IList.empty());
   }
 
-  // List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(Map<String, dynamic> map) {
-  //   return map.entries.map((entry) {
-  //     if (entry.value is TranslationKey) {
-  //       // This is a leaf node (a specific translation key)
-  //       final key = entry.value as TranslationKey;
-  //       final translationMap = translations[key]?.translations;
-  //       // only count when a translation is actually filled
-  //       final countTranslationsWithContent = translationMap?.values
-  //           .where((text) => text.trim().isNotEmpty)
-  //           .length;
-  //       return TreeViewNode<TranslationKeyTreeNode>(
-  //         TranslationKeyTreeNode(
-  //           translationKey: key,
-  //           hasAllKeys: countTranslationsWithContent == languages.length,
-  //         ),
-  //       );
-  //     } else {
-  //       // This is a folder/group node
-  //       // Here, we'll create a dummy TranslationKey to represent the branch
-  //       return TreeViewNode<TranslationKeyTreeNode>(
-  //         TranslationKeyTreeNode(
-  //           translationKey: TranslationKey.fromKey(entry.key),
-  //           hasAllKeys: true, // this needs to be false if a child has it as false
-  //         ),
-  //         children: _mapToNodes(entry.value as Map<String, dynamic>),
-  //       );
-  //     }
-  //   }).toList();
-  // }
-
-  List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(Map<String, dynamic> map) {
+  List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(
+    Map<String, dynamic> map,
+    ISet<TranslationKey> keysBeingAdded,
+    IList<String> parentPath,
+  ) {
     return map.entries.map((entry) {
+      final currentPath = parentPath.add(entry.key);
+      final currentTranslationKey = TranslationKey(currentPath);
+
       if (entry.value is TranslationKey) {
         // leaf node
         final key = entry.value as TranslationKey;
@@ -255,9 +254,19 @@ extension LocalizationTree on LocalizationProject {
       } else {
         // branch node
         // Recurse first to get the children nodes
-        final List<TreeViewNode<TranslationKeyTreeNode>> children = _mapToNodes(
-          entry.value as Map<String, dynamic>,
-        );
+        final branchTranslationKey = currentTranslationKey;
+        final List<TreeViewNode<TranslationKeyTreeNode>> children = [
+          if (keysBeingAdded.contains(branchTranslationKey))
+            // add virtual node for adding a new node
+            TreeViewNode<TranslationKeyTreeNode>(
+              TranslationKeyTreeNode(
+                translationKey: branchTranslationKey.withAddedKeyParts([Constants.addingKey].lock),
+                hasAllKeys: true,
+                isAddingKey: true,
+              ),
+            ),
+          ..._mapToNodes(entry.value as Map<String, dynamic>, keysBeingAdded, currentPath),
+        ];
 
         // Determine if ALL children have hasAllKeys set to true
         // If any child is missing a translation, this parent is also incomplete.
@@ -265,7 +274,7 @@ extension LocalizationTree on LocalizationProject {
 
         return TreeViewNode<TranslationKeyTreeNode>(
           TranslationKeyTreeNode(
-            translationKey: TranslationKey.fromKey(entry.key),
+            translationKey: branchTranslationKey,
             hasAllKeys: allChildrenComplete,
           ),
           children: children,

@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/util/list_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
+import '../constants.dart';
 import '../model/translation.dart';
 
 part 'localization_project_state.g.dart';
@@ -63,11 +66,48 @@ class LocalizationProjectState extends _$LocalizationProjectState {
   }
 }
 
+/// Contains a Set of [TranslationKey]. Each of these keys means that currently there is a new key being added as new child of it.
+@Riverpod(keepAlive: true)
+class TranslationKeysAdding extends _$TranslationKeysAdding {
+  @override
+  ISet<TranslationKey> build() {
+    return const ISet.empty();
+  }
+
+  void add(TranslationKey key) {
+    state = state.add(key);
+  }
+
+  void remove(TranslationKey key) {
+    state = state.remove(key);
+  }
+
+  void finishAdding(TranslationKey? newTranslationKey, TranslationKey virtualNodeKey) {
+    // remove virtual adding tree node
+    state = state.remove(virtualNodeKey.parent);
+
+    if (newTranslationKey == null) {
+      return;
+    }
+
+    ref
+        .read(localizationProjectStateProvider.notifier)
+        .updateTranslation(
+          TranslationKey(
+            newTranslationKey.keyParts.where((p) => p != Constants.addingKey).toIList(),
+          ),
+          Translation(key: newTranslationKey),
+        );
+  }
+}
+
 @riverpod
 List<TreeViewNode<TranslationKeyTreeNode>>? localizationTreeNodes(Ref ref) {
   final localizationProject = ref.watch(localizationProjectStateProvider).value;
+  final keysBeingAdded = ref.watch(translationKeysAddingProvider);
 
   if (localizationProject == null) return null;
 
-  return localizationProject.toTreeNodes();
+  final r = localizationProject.toTreeNodes(keysBeingAdded);
+  return r;
 }

@@ -61,6 +61,65 @@ abstract class _$LocalizationProjectState
   }
 }
 
+/// Contains a Set of [TranslationKey]. Each of these keys means that currently there is a new key being added as new child of it.
+
+@ProviderFor(TranslationKeysAdding)
+final translationKeysAddingProvider = TranslationKeysAddingProvider._();
+
+/// Contains a Set of [TranslationKey]. Each of these keys means that currently there is a new key being added as new child of it.
+final class TranslationKeysAddingProvider
+    extends $NotifierProvider<TranslationKeysAdding, ISet<TranslationKey>> {
+  /// Contains a Set of [TranslationKey]. Each of these keys means that currently there is a new key being added as new child of it.
+  TranslationKeysAddingProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'translationKeysAddingProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$translationKeysAddingHash();
+
+  @$internal
+  @override
+  TranslationKeysAdding create() => TranslationKeysAdding();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ISet<TranslationKey> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ISet<TranslationKey>>(value),
+    );
+  }
+}
+
+String _$translationKeysAddingHash() =>
+    r'3fe5299993f8159ded213e3038ac78983e7a6a47';
+
+/// Contains a Set of [TranslationKey]. Each of these keys means that currently there is a new key being added as new child of it.
+
+abstract class _$TranslationKeysAdding extends $Notifier<ISet<TranslationKey>> {
+  ISet<TranslationKey> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<ISet<TranslationKey>, ISet<TranslationKey>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<ISet<TranslationKey>, ISet<TranslationKey>>,
+              ISet<TranslationKey>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(localizationTreeNodes)
 final localizationTreeNodesProvider = LocalizationTreeNodesProvider._();
 
@@ -112,4 +171,4 @@ final class LocalizationTreeNodesProvider
 }
 
 String _$localizationTreeNodesHash() =>
-    r'76e066c18207bc9c6bb1a4cecc04538426bfd9e0';
+    r'f30da37bad0ccd66cb390a52280df5835d316368';
