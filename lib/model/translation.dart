@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:localizator/model/translation_locale.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 class TranslationKey {
@@ -29,30 +30,54 @@ class Translation {
   Translation({required this.key, this.translations = const IMap.empty()});
 
   final TranslationKey key;
-  // Using IMap here ensures the values for each language are also immutable
-  final IMap<String, String> translations;
+  // Maps the locale to the actual translated text
+  final IMap<TranslationLocale, String> translations;
 
-  Translation copyWith({IMap<String, String>? translations}) {
+  Translation copyWith({IMap<TranslationLocale, String>? translations}) {
     return Translation(key: key, translations: (translations ?? this.translations));
+  }
+
+  Translation withUpdatedTranslation(TranslationLocale locale, String text) {
+    return copyWith(translations: translations.update(locale, (_) => text, ifAbsent: () => text));
   }
 }
 
 class LocalizationProject {
-  // We use ListMap to preserve the order in which keys were discovered
-  final IMap<TranslationKey, Translation> rows;
-  final ISet<String> languages;
+  const LocalizationProject({
+    required this.translations,
+    required this.languages,
+    this.isDirty = false,
+  });
+  final IMap<TranslationKey, Translation> translations;
+  final ISet<TranslationLocale> languages;
+  final bool isDirty;
 
-  LocalizationProject({required this.rows, required this.languages});
+  LocalizationProject withIsDirty(bool isDirty) =>
+      LocalizationProject(translations: translations, languages: languages, isDirty: isDirty);
+
+  LocalizationProject withTranslation({
+    required TranslationKey key,
+    required Translation translation,
+  }) {
+    // update translation value, adding key if not present
+    final newTranslations = translations.update(
+      key,
+      (_) => translation,
+      ifAbsent: () => translation,
+    );
+    return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
+  }
 
   static LocalizationProject parseTranslationJson({
     required Map<String, dynamic> json,
-    required String langCode,
+    required TranslationLocale locale,
     LocalizationProject? existingProject,
   }) {
     // Start with existing data or empty collections
     IMap<TranslationKey, Translation> translations =
-        existingProject?.rows ?? const IMap<TranslationKey, Translation>.empty();
-    ISet<String> languages = (existingProject?.languages ?? ISet<String>()).add(langCode);
+        existingProject?.translations ?? const IMap<TranslationKey, Translation>.empty();
+    ISet<TranslationLocale> languages = (existingProject?.languages ?? ISet<TranslationLocale>())
+        .add(locale);
 
     void recurse(Map<String, dynamic> data, List<String> path) {
       data.forEach((key, value) {
@@ -69,7 +94,7 @@ class LocalizationProject {
 
           if (existingTranslation != null) {
             // Key exists, add this language to it
-            final updatedMap = existingTranslation.translations.add(langCode, value);
+            final updatedMap = existingTranslation.translations.add(locale, value);
             translations = translations.add(
               translationKey,
               existingTranslation.copyWith(translations: updatedMap),
@@ -78,7 +103,7 @@ class LocalizationProject {
             // New key discovered
             translations = translations.add(
               translationKey,
-              Translation(key: translationKey, translations: {langCode: value}.lock),
+              Translation(key: translationKey, translations: {locale: value}.lock),
             );
           }
         }
@@ -86,14 +111,14 @@ class LocalizationProject {
     }
 
     recurse(json, []);
-    return LocalizationProject(rows: translations, languages: languages);
+    return LocalizationProject(translations: translations, languages: languages);
   }
 }
 
 extension LocalizationExporter on LocalizationProject {
-  String toJsonString(String langCode, {bool sortByAlphabet = false}) {
+  String toJsonString(TranslationLocale locale, {bool sortByAlphabet = false}) {
     // Get the keys in the desired order
-    Iterable<TranslationKey> sortedKeys = rows.keys;
+    Iterable<TranslationKey> sortedKeys = translations.keys;
     if (sortByAlphabet) {
       // Sorts by the full dot-notation string representation
       final list = sortedKeys.toList();
@@ -104,8 +129,8 @@ extension LocalizationExporter on LocalizationProject {
     final Map<String, dynamic> root = {};
 
     for (final translationKey in sortedKeys) {
-      final translation = rows[translationKey];
-      final value = translation?.translations[langCode];
+      final translation = translations[translationKey];
+      final value = translation?.translations[locale];
 
       // Skip if this specific language doesn't have a value for this key
       if (value == null) continue;
@@ -148,13 +173,19 @@ extension LocalizationExporter on LocalizationProject {
   }
 }
 
+class TranslationKeyTreeNode {
+  const TranslationKeyTreeNode({required this.translationKey, required this.hasAllKeys});
+  final TranslationKey translationKey;
+  final bool hasAllKeys;
+}
+
 extension LocalizationTree on LocalizationProject {
-  List<TreeViewNode<TranslationKey>> toTreeNodes() {
+  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes() {
     // Build a nested helper map
     // String (part) -> Map (children) OR TranslationKey (leaf)
     final Map<String, dynamic> structure = {};
 
-    for (final translationKey in rows.keys) {
+    for (final translationKey in translations.keys) {
       Map<String, dynamic> current = structure;
       final parts = translationKey.keyParts;
 
@@ -175,18 +206,69 @@ extension LocalizationTree on LocalizationProject {
     return _mapToNodes(structure);
   }
 
-  List<TreeViewNode<TranslationKey>> _mapToNodes(Map<String, dynamic> map) {
+  // List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(Map<String, dynamic> map) {
+  //   return map.entries.map((entry) {
+  //     if (entry.value is TranslationKey) {
+  //       // This is a leaf node (a specific translation key)
+  //       final key = entry.value as TranslationKey;
+  //       final translationMap = translations[key]?.translations;
+  //       // only count when a translation is actually filled
+  //       final countTranslationsWithContent = translationMap?.values
+  //           .where((text) => text.trim().isNotEmpty)
+  //           .length;
+  //       return TreeViewNode<TranslationKeyTreeNode>(
+  //         TranslationKeyTreeNode(
+  //           translationKey: key,
+  //           hasAllKeys: countTranslationsWithContent == languages.length,
+  //         ),
+  //       );
+  //     } else {
+  //       // This is a folder/group node
+  //       // Here, we'll create a dummy TranslationKey to represent the branch
+  //       return TreeViewNode<TranslationKeyTreeNode>(
+  //         TranslationKeyTreeNode(
+  //           translationKey: TranslationKey.fromKey(entry.key),
+  //           hasAllKeys: true, // this needs to be false if a child has it as false
+  //         ),
+  //         children: _mapToNodes(entry.value as Map<String, dynamic>),
+  //       );
+  //     }
+  //   }).toList();
+  // }
+
+  List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(Map<String, dynamic> map) {
     return map.entries.map((entry) {
       if (entry.value is TranslationKey) {
-        // This is a leaf node (a specific translation key)
-        return TreeViewNode<TranslationKey>(entry.value as TranslationKey);
+        // leaf node
+        final key = entry.value as TranslationKey;
+        final translationMap = translations[key]?.translations;
+
+        final countTranslationsWithContent =
+            translationMap?.values.where((text) => text.trim().isNotEmpty).length ?? 0;
+
+        return TreeViewNode<TranslationKeyTreeNode>(
+          TranslationKeyTreeNode(
+            translationKey: key,
+            hasAllKeys: countTranslationsWithContent == languages.length,
+          ),
+        );
       } else {
-        // This is a folder/group node
-        // We create a "virtual" key for the group or use a null-content node if the package allows
-        // Here, we'll create a dummy TranslationKey to represent the branch
-        return TreeViewNode<TranslationKey>(
-          TranslationKey.fromKey(entry.key),
-          children: _mapToNodes(entry.value as Map<String, dynamic>),
+        // branch node
+        // Recurse first to get the children nodes
+        final List<TreeViewNode<TranslationKeyTreeNode>> children = _mapToNodes(
+          entry.value as Map<String, dynamic>,
+        );
+
+        // Determine if ALL children have hasAllKeys set to true
+        // If any child is missing a translation, this parent is also incomplete.
+        final bool allChildrenComplete = children.every((node) => node.content.hasAllKeys);
+
+        return TreeViewNode<TranslationKeyTreeNode>(
+          TranslationKeyTreeNode(
+            translationKey: TranslationKey.fromKey(entry.key),
+            hasAllKeys: allChildrenComplete,
+          ),
+          children: children,
         );
       }
     }).toList();

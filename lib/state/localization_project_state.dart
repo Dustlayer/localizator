@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:localizator/state/app_config.dart';
+import 'package:localizator/util/list_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
@@ -25,16 +26,45 @@ class LocalizationProjectState extends _$LocalizationProjectState {
       final json = jsonDecode(await file.readAsString());
       project = LocalizationProject.parseTranslationJson(
         json: json,
-        langCode: translationFile.locale.locale,
+        locale: translationFile.locale,
         existingProject: project,
       );
     }
     return project;
   }
+
+  void updateTranslation(TranslationKey key, Translation translation) {
+    final localizationProject = state.value;
+    if (localizationProject == null) return;
+
+    state = AsyncData(localizationProject.withTranslation(key: key, translation: translation));
+  }
+
+  Future<void> saveToFiles() async {
+    final appConfig = ref.read(appConfigStateProvider).value;
+    final localizationProject = state.value;
+    if (appConfig?.lastUsedProject == null ||
+        localizationProject == null ||
+        localizationProject.isDirty != true) {
+      return;
+    }
+
+    for (final locale in localizationProject.languages) {
+      final translationFile = appConfig?.lastUsedProject?.filePaths.firstWhereOrNull(
+        (file) => file.locale == locale,
+      );
+      if (translationFile == null) continue;
+
+      final jsonString = localizationProject.toJsonString(locale);
+      await translationFile.file.writeAsString(jsonString);
+    }
+
+    state = AsyncData(localizationProject.withIsDirty(false));
+  }
 }
 
 @riverpod
-List<TreeViewNode<TranslationKey>>? localizationTreeNodes(Ref ref) {
+List<TreeViewNode<TranslationKeyTreeNode>>? localizationTreeNodes(Ref ref) {
   final localizationProject = ref.watch(localizationProjectStateProvider).value;
 
   if (localizationProject == null) return null;

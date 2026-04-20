@@ -35,7 +35,7 @@ final class LocalizationProjectStateProvider
 }
 
 String _$localizationProjectStateHash() =>
-    r'55c04e0d455aaeecdff07d96f45e690ad133e21f';
+    r'd3ef185fbb8e0645cb6a579844ee4f4e6b0714d7';
 
 abstract class _$LocalizationProjectState
     extends $AsyncNotifier<LocalizationProject?> {
@@ -67,11 +67,11 @@ final localizationTreeNodesProvider = LocalizationTreeNodesProvider._();
 final class LocalizationTreeNodesProvider
     extends
         $FunctionalProvider<
-          List<TreeViewNode<TranslationKey>>?,
-          List<TreeViewNode<TranslationKey>>?,
-          List<TreeViewNode<TranslationKey>>?
+          List<TreeViewNode<TranslationKeyTreeNode>>?,
+          List<TreeViewNode<TranslationKeyTreeNode>>?,
+          List<TreeViewNode<TranslationKeyTreeNode>>?
         >
-    with $Provider<List<TreeViewNode<TranslationKey>>?> {
+    with $Provider<List<TreeViewNode<TranslationKeyTreeNode>>?> {
   LocalizationTreeNodesProvider._()
     : super(
         from: null,
@@ -88,25 +88,28 @@ final class LocalizationTreeNodesProvider
 
   @$internal
   @override
-  $ProviderElement<List<TreeViewNode<TranslationKey>>?> $createElement(
+  $ProviderElement<List<TreeViewNode<TranslationKeyTreeNode>>?> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  List<TreeViewNode<TranslationKey>>? create(Ref ref) {
+  List<TreeViewNode<TranslationKeyTreeNode>>? create(Ref ref) {
     return localizationTreeNodes(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<TreeViewNode<TranslationKey>>? value) {
+  Override overrideWithValue(
+    List<TreeViewNode<TranslationKeyTreeNode>>? value,
+  ) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<List<TreeViewNode<TranslationKey>>?>(
-        value,
-      ),
+      providerOverride:
+          $SyncValueProvider<List<TreeViewNode<TranslationKeyTreeNode>>?>(
+            value,
+          ),
     );
   }
 }
 
 String _$localizationTreeNodesHash() =>
-    r'd93453899eb3804bfdcca32fb21067c410e386d8';
+    r'76e066c18207bc9c6bb1a4cecc04538426bfd9e0';
