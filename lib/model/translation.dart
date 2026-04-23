@@ -147,7 +147,7 @@ extension LocalizationExporter on LocalizationProject {
     }
 
     // Use JsonEncoder.withIndent for a clean, human-readable file
-    return const JsonEncoder.withIndent('  ').convert(root);
+    return "${const JsonEncoder.withIndent('  ').convert(root)}\n";
   }
 
   void _assignNested(
@@ -197,12 +197,23 @@ class TranslationKeyTreeNode {
   /// Signals that this is a "virtual node" and a key is being added using this node.
   /// A TextField should be displayed so the user can input a new translation key.
   final bool isAddingKey;
+
+  // Leaving out isAddingKey to not collapse the TreeViewNode
+  @override
+  bool operator ==(Object other) =>
+      other is TranslationKeyTreeNode && translationKey == other.translationKey;
+
+  @override
+  int get hashCode => translationKey.hashCode;
 }
 
 extension LocalizationTree on LocalizationProject {
   /// [keysBeingAdded] contains a Set of keys. "Underneath" / Inside of each key there should be
   /// "virtual" node with an input field, where the user can input a new node.
-  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes(ISet<TranslationKey> keysBeingAdded) {
+  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes(
+    ISet<TranslationKey> keysBeingAdded,
+    Set<TranslationKey> expandedKeys,
+  ) {
     // Build a nested helper map
     // String (part) -> Map (children) OR TranslationKey (leaf)
     final Map<String, dynamic> structure = {};
@@ -225,13 +236,14 @@ extension LocalizationTree on LocalizationProject {
     }
 
     // Recursively convert the map to TreeViewNodes
-    return _mapToNodes(structure, keysBeingAdded, const IList.empty());
+    return _mapToNodes(structure, keysBeingAdded, const IList.empty(), expandedKeys);
   }
 
   List<TreeViewNode<TranslationKeyTreeNode>> _mapToNodes(
     Map<String, dynamic> map,
     ISet<TranslationKey> keysBeingAdded,
     IList<String> parentPath,
+    Set<TranslationKey> expandedKeys,
   ) {
     return map.entries.map((entry) {
       final currentPath = parentPath.add(entry.key);
@@ -265,19 +277,27 @@ extension LocalizationTree on LocalizationProject {
                 isAddingKey: true,
               ),
             ),
-          ..._mapToNodes(entry.value as Map<String, dynamic>, keysBeingAdded, currentPath),
+          ..._mapToNodes(
+            entry.value as Map<String, dynamic>,
+            keysBeingAdded,
+            currentPath,
+            expandedKeys,
+          ),
         ];
 
         // Determine if ALL children have hasAllKeys set to true
         // If any child is missing a translation, this parent is also incomplete.
         final bool allChildrenComplete = children.every((node) => node.content.hasAllKeys);
 
+        final nodeContent = TranslationKeyTreeNode(
+          translationKey: branchTranslationKey,
+          hasAllKeys: allChildrenComplete,
+        );
+
         return TreeViewNode<TranslationKeyTreeNode>(
-          TranslationKeyTreeNode(
-            translationKey: branchTranslationKey,
-            hasAllKeys: allChildrenComplete,
-          ),
+          nodeContent,
           children: children,
+          expanded: expandedKeys.contains(nodeContent.translationKey),
         );
       }
     }).toList();

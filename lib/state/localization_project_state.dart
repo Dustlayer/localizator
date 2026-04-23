@@ -2,11 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/util/list_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 import '../constants.dart';
 import '../model/translation.dart';
@@ -99,15 +97,4 @@ class TranslationKeysAdding extends _$TranslationKeysAdding {
           Translation(key: newTranslationKey),
         );
   }
-}
-
-@riverpod
-List<TreeViewNode<TranslationKeyTreeNode>>? localizationTreeNodes(Ref ref) {
-  final localizationProject = ref.watch(localizationProjectStateProvider).value;
-  final keysBeingAdded = ref.watch(translationKeysAddingProvider);
-
-  if (localizationProject == null) return null;
-
-  final r = localizationProject.toTreeNodes(keysBeingAdded);
-  return r;
 }

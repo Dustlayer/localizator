@@ -8,6 +8,7 @@ import 'package:localizator/state/localization_project_state.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../dialogs/add_file_to_project_dialog.dart';
+import '../dialogs/confirm_dialog.dart';
 import '../dialogs/new_project_dialog.dart';
 import '../model/project.dart';
 import '../util/list_utils.dart';
@@ -110,6 +111,7 @@ class _TopBarState extends ConsumerState<TopBar> {
                     child: Align(
                       alignment: .centerLeft,
                       child: Card(
+                        padding: .all(8),
                         borderColor: Colors.yellow.shade600,
                         child: Text(
                           "Muss gespeichert werden",
@@ -154,12 +156,36 @@ class _TopBarState extends ConsumerState<TopBar> {
                 ),
               ),
               Tooltip(
+                tooltip: (context) => TooltipContainer(child: const Text("Dateien neu laden")),
+                child: IconButton.primary(
+                  icon: const Icon(LucideIcons.refreshCw),
+                  onPressed: () async {
+                    if (ref.read(localizationProjectStateProvider).value?.isDirty ?? false) {
+                      final confirmed = await showConfirmDialog(
+                        context,
+                        title: "Neu laden?",
+                        body:
+                            "Das verwirft aktuelle Änderungen, die noch nicht gespeichert wurden.",
+                      );
+                      if (!confirmed) return;
+                    }
+                    ref.invalidate(localizationProjectStateProvider);
+                  },
+                ),
+              ),
+              Tooltip(
                 tooltip: (context) =>
                     TooltipContainer(child: const Text("Gesamte App-Config löschen")),
                 child: IconButton.destructive(
                   icon: const Icon(Icons.settings, color: Colors.red),
                   onPressed: () async {
                     // delete config
+                    final confirmed = await showConfirmDialog(
+                      context,
+                      title: "Einstellungen löschen?",
+                      body: "Es werden alle hinterlegten Projekte und Einstellungen gelöscht.",
+                    );
+                    if (!confirmed) return;
                     await AppConfig.delete();
                     ref.invalidate(appConfigStateProvider);
                   },

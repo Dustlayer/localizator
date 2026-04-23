@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:flutter/services.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/state/localization_project_state.dart';
 import 'package:localizator/widgets/main_edit_area.dart';
@@ -38,6 +39,7 @@ class TranslationKeyTree extends ConsumerStatefulWidget {
 
 class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
   final _treeController = TreeViewController();
+  final Set<TranslationKey> _expandedKeys = {};
   TranslationKey? _selectedKey;
 
   void _handleSelectTranslationKey(TranslationKey key) {
@@ -87,19 +89,23 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                         child: Consumer(
                           builder: (context, ref, child) {
                             final localizationProject = ref.watch(localizationProjectStateProvider);
-                            final localizationTree = ref.watch(localizationTreeNodesProvider);
+                            final keysBeingAdded = ref.watch(translationKeysAddingProvider);
+
+                            final tree = localizationProject.value?.toTreeNodes(
+                              keysBeingAdded,
+                              _expandedKeys,
+                            );
                             return switch (localizationProject) {
                               AsyncLoading() => Center(child: CircularProgressIndicator()),
                               AsyncError(error: final error) => Center(
                                 child: Text("Fehler: $error"),
                               ),
                               AsyncData(value: final _?) => TreeView(
-                                // TODO: nuclear option?
-                                // key: ValueKey(
-                                //   'tree_${ref.read(translationKeysAddingProvider).hashCode}',
-                                // ),
+                                onNodeToggle: (node) => node.isExpanded
+                                    ? _expandedKeys.add(node.content.translationKey)
+                                    : _expandedKeys.remove(node.content.translationKey),
                                 controller: _treeController,
-                                tree: localizationTree!,
+                                tree: tree!,
                                 indentation: TreeViewIndentationType.none,
                                 verticalDetails: const ScrollableDetails.vertical(
                                   physics: ClampingScrollPhysics(),
@@ -192,7 +198,6 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
     final Curve animationCurve =
         widget.toggleAnimationStyle.curve ?? TreeView.defaultAnimationCurve;
     final treeViewController = TreeViewController.of(context);
-    final index = treeViewController.getActiveIndexFor(widget.node);
     final treeNodeDepth = widget.node.depth ?? 0;
     final isLeafNode = widget.node.children.isEmpty;
 
@@ -236,19 +241,36 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
                 child: isVirtualAddingNode
                     ? SizedBox(
                         width: 150,
-                        child: TextField(
-                          controller: _controller,
-                          onSubmitted: (text) {
-                            FocusScope.of(context).unfocus();
-                            _controller?.text = "";
-                            widget.onFinishAddTranslationKey(
-                              text.trim().isEmpty
-                                  ? null
-                                  : node.content.translationKey.withAddedKeyParts(
-                                      text.split('.').toIList(),
-                                    ),
-                            );
+                        child: CallbackShortcuts(
+                          bindings: {
+                            const SingleActivator(LogicalKeyboardKey.escape): () {
+                              widget.onFinishAddTranslationKey(null);
+                            },
                           },
+                          child: TextField(
+                            controller: _controller,
+                            placeholder: const Text("ordner.key"),
+                            features: [
+                              InputFeature.trailing(
+                                IconButton.ghost(
+                                  density: .compact,
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => widget.onFinishAddTranslationKey(null),
+                                ),
+                              ),
+                            ],
+                            onSubmitted: (text) {
+                              FocusScope.of(context).unfocus();
+                              _controller?.text = "";
+                              widget.onFinishAddTranslationKey(
+                                text.trim().isEmpty
+                                    ? null
+                                    : node.content.translationKey.withAddedKeyParts(
+                                        text.split('.').toIList(),
+                                      ),
+                              );
+                            },
+                          ),
                         ),
                       )
                     : GestureDetector(
