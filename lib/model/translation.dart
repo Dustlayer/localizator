@@ -210,15 +210,18 @@ class TranslationKeyTreeNode {
 extension LocalizationTree on LocalizationProject {
   /// [keysBeingAdded] contains a Set of keys. "Underneath" / Inside of each key there should be
   /// "virtual" node with an input field, where the user can input a new node.
-  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes(
-    ISet<TranslationKey> keysBeingAdded,
-    Set<TranslationKey> expandedKeys,
-  ) {
+  List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes({
+    required ISet<TranslationKey> keysBeingAdded,
+    required Set<TranslationKey> expandedKeys,
+    String query = "",
+  }) {
     // Build a nested helper map
     // String (part) -> Map (children) OR TranslationKey (leaf)
     final Map<String, dynamic> structure = {};
+    final lowerQuery = query.trim().toLowerCase();
 
     for (final translationKey in translations.keys) {
+      if (lowerQuery.isNotEmpty && !translationKey.key.toLowerCase().contains(lowerQuery)) continue;
       Map<String, dynamic> current = structure;
       final parts = translationKey.keyParts;
 

@@ -6,7 +6,7 @@ import 'package:localizator/state/app_config.dart';
 import 'package:localizator/state/localization_project_state.dart';
 import 'package:localizator/widgets/main_edit_area.dart';
 import 'package:localizator/widgets/top_bar.dart';
-import 'package:shadcn_flutter/shadcn_flutter_experimental.dart' hide TreeView;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide TreeView;
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,9 +38,20 @@ class TranslationKeyTree extends ConsumerStatefulWidget {
 }
 
 class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
+  final _verticalController = ScrollController();
+  final _horizontalController = ScrollController();
   final _treeController = TreeViewController();
   final Set<TranslationKey> _expandedKeys = {};
   TranslationKey? _selectedKey;
+  final ValueNotifier<String> _keyQuery = ValueNotifier("");
+
+  @override
+  void dispose() {
+    _verticalController.dispose();
+    _horizontalController.dispose();
+    _keyQuery.dispose();
+    super.dispose();
+  }
 
   void _handleSelectTranslationKey(TranslationKey key) {
     setState(() {
@@ -79,6 +90,44 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                   ),
                 ),
                 const Divider(),
+                Row(
+                  spacing: 4,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        placeholder: const Text("Suche key.key..."),
+                        onChanged: (value) => _keyQuery.value = value,
+                      ),
+                    ),
+                    Tooltip(
+                      tooltip: (context) => TooltipContainer(child: const Text("Alle ausklappen")),
+                      child: IconButton.outline(
+                        icon: const Icon(LucideIcons.expand),
+                        onPressed: () async {
+                          final localizationProject = await ref.read(
+                            localizationProjectStateProvider.future,
+                          );
+                          if (localizationProject?.translations != null) {
+                            _expandedKeys.addAll(localizationProject!.translations.keys);
+                          }
+                          _treeController.expandAll();
+                        },
+                      ),
+                    ),
+                    Tooltip(
+                      tooltip: (context) => TooltipContainer(child: const Text("Alle einklappen")),
+                      child: IconButton.outline(
+                        icon: const Icon(LucideIcons.listCollapse),
+                        onPressed: () {
+                          _expandedKeys.clear();
+                          _verticalController.jumpTo(0);
+                          _horizontalController.jumpTo(0);
+                          _treeController.collapseAll();
+                        },
+                      ),
+                    ),
+                  ],
+                ).withPadding(all: 6),
                 appConfig?.lastUsedProject == null
                     ? Expanded(
                         child: Center(
@@ -91,49 +140,74 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                             final localizationProject = ref.watch(localizationProjectStateProvider);
                             final keysBeingAdded = ref.watch(translationKeysAddingProvider);
 
-                            final tree = localizationProject.value?.toTreeNodes(
-                              keysBeingAdded,
-                              _expandedKeys,
-                            );
                             return switch (localizationProject) {
                               AsyncLoading() => Center(child: CircularProgressIndicator()),
                               AsyncError(error: final error) => Center(
                                 child: Text("Fehler: $error"),
                               ),
-                              AsyncData(value: final _?) => TreeView(
-                                onNodeToggle: (node) => node.isExpanded
-                                    ? _expandedKeys.add(node.content.translationKey)
-                                    : _expandedKeys.remove(node.content.translationKey),
-                                controller: _treeController,
-                                tree: tree!,
-                                indentation: TreeViewIndentationType.none,
-                                verticalDetails: const ScrollableDetails.vertical(
-                                  physics: ClampingScrollPhysics(),
-                                ),
-                                horizontalDetails: const ScrollableDetails.horizontal(),
-                                treeRowBuilder: (TreeViewNode<TranslationKeyTreeNode> node) {
-                                  return TreeRow(
-                                    extent: node.content.isAddingKey
-                                        ? const FixedSpanExtent(55)
-                                        : const FixedSpanExtent(40),
+                              AsyncData(value: final localizationProject?) => ValueListenableBuilder(
+                                valueListenable: _keyQuery,
+                                builder: (BuildContext context, keyQuery, Widget? child) {
+                                  if (localizationProject.translations.isEmpty) {
+                                    return const Center(child: Text("Keine Keys vorhanden"));
+                                  }
+                                  final tree = localizationProject.toTreeNodes(
+                                    keysBeingAdded: keysBeingAdded,
+                                    expandedKeys: _expandedKeys,
+                                    query: keyQuery,
                                   );
-                                },
-                                treeNodeBuilder: (context, node, toggleAnimationStyle) {
-                                  return _TranslationKeyTreeNodeWidget(
-                                    key: ValueKey(
-                                      'row_${node.content.translationKey.key}_${node.content.isAddingKey}',
-                                    ),
-                                    node: node,
-                                    toggleAnimationStyle: toggleAnimationStyle,
-                                    onSelectTranslationKey: _handleSelectTranslationKey,
-                                    selectedKey: _selectedKey,
-                                    onStartAddTranslationKey: (key) {
-                                      ref.read(translationKeysAddingProvider.notifier).add(key);
+                                  if (tree.isEmpty) {
+                                    return const Center(
+                                      child: Text(
+                                        "Keine Keys gefunden",
+                                        style: TextStyle(color: Colors.gray),
+                                      ),
+                                    );
+                                  }
+                                  return TreeView(
+                                    onNodeToggle: (node) {
+                                      if (node.isExpanded) {
+                                        _expandedKeys.add(node.content.translationKey);
+                                        return;
+                                      }
+                                      _expandedKeys.remove(node.content.translationKey);
                                     },
-                                    onFinishAddTranslationKey: (key) {
-                                      ref
-                                          .read(translationKeysAddingProvider.notifier)
-                                          .finishAdding(key, node.content.translationKey);
+                                    controller: _treeController,
+                                    tree: tree,
+                                    indentation: TreeViewIndentationType.none,
+                                    verticalDetails: ScrollableDetails.vertical(
+                                      controller: _verticalController,
+                                      physics: const ClampingScrollPhysics(),
+                                    ),
+                                    horizontalDetails: ScrollableDetails.horizontal(
+                                      controller: _horizontalController,
+                                      physics: const ClampingScrollPhysics(),
+                                    ),
+                                    treeRowBuilder: (TreeViewNode<TranslationKeyTreeNode> node) {
+                                      return TreeRow(
+                                        extent: node.content.isAddingKey
+                                            ? const FixedSpanExtent(55)
+                                            : const FixedSpanExtent(40),
+                                      );
+                                    },
+                                    treeNodeBuilder: (context, node, toggleAnimationStyle) {
+                                      return _TranslationKeyTreeNodeWidget(
+                                        key: ValueKey(
+                                          'row_${node.content.translationKey.key}_${node.content.isAddingKey}',
+                                        ),
+                                        node: node,
+                                        toggleAnimationStyle: toggleAnimationStyle,
+                                        onSelectTranslationKey: _handleSelectTranslationKey,
+                                        selectedKey: _selectedKey,
+                                        onStartAddTranslationKey: (key) {
+                                          ref.read(translationKeysAddingProvider.notifier).add(key);
+                                        },
+                                        onFinishAddTranslationKey: (key) {
+                                          ref
+                                              .read(translationKeysAddingProvider.notifier)
+                                              .finishAdding(key, node.content.translationKey);
+                                        },
+                                      );
                                     },
                                   );
                                 },
