@@ -34,11 +34,29 @@ class LocalizationProjectState extends _$LocalizationProjectState {
     return project;
   }
 
+  void set(LocalizationProject project) {
+    state = AsyncData(project);
+  }
+
   void updateTranslation(TranslationKey key, Translation translation) {
     final localizationProject = state.value;
     if (localizationProject == null) return;
 
     state = AsyncData(localizationProject.withTranslation(key: key, translation: translation));
+  }
+
+  void removeTranslation(TranslationKey key) {
+    final localizationProject = state.value;
+    if (localizationProject == null) return;
+
+    state = AsyncData(localizationProject.withoutTranslation(key: key));
+  }
+
+  void removeTranslationsWhere(bool Function(TranslationKey, Translation) predicate) {
+    final localizationProject = state.value;
+    if (localizationProject == null) return;
+
+    state = AsyncData(localizationProject.withoutTranslationsWhere(predicate));
   }
 
   Future<void> saveToFiles() async {

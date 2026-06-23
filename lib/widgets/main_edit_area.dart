@@ -28,7 +28,7 @@ class _MainEditAreaState extends ConsumerState<MainEditArea> {
               ),
       ),
       AsyncData() => Center(child: Text("Noch keine Dateien")),
-      _ => CircularProgressIndicator(),
+      _ => Center(child: CircularProgressIndicator()),
     };
   }
 }

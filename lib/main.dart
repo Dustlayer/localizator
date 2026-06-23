@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/services.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/state/localization_project_state.dart';
+import 'package:localizator/util/toast.dart';
 import 'package:localizator/widgets/main_edit_area.dart';
 import 'package:localizator/widgets/top_bar.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TreeView;
@@ -207,6 +208,43 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                                               .read(translationKeysAddingProvider.notifier)
                                               .finishAdding(key, node.content.translationKey);
                                         },
+                                        onDeleteTranslationKey: (treeNode) {
+                                          final projectBackup = ref
+                                              .read(localizationProjectStateProvider)
+                                              .value;
+                                          if (projectBackup != null) {
+                                            showToast(
+                                              context: context,
+                                              builder: buildToast(
+                                                title: "Übersetzung gelöscht",
+                                                subtitle:
+                                                    "Rechts klicken um's rückgängig zu machen",
+                                                actionLabel: "Rückgängig",
+                                                onActionClick: () {
+                                                  ref
+                                                      .read(
+                                                        localizationProjectStateProvider.notifier,
+                                                      )
+                                                      .set(projectBackup);
+                                                },
+                                              ),
+                                            );
+                                          }
+                                          // leaf node
+                                          if (treeNode.children.isEmpty) {
+                                            ref
+                                                .read(localizationProjectStateProvider.notifier)
+                                                .removeTranslation(treeNode.content.translationKey);
+                                          } else {
+                                            // delete whole "folder" of keys
+                                            final folderKey = treeNode.content.translationKey.key;
+                                            ref
+                                                .read(localizationProjectStateProvider.notifier)
+                                                .removeTranslationsWhere(
+                                                  (key, _) => key.key.startsWith(folderKey),
+                                                );
+                                          }
+                                        },
                                       );
                                     },
                                   );
@@ -237,6 +275,7 @@ class _TranslationKeyTreeNodeWidget extends StatefulWidget {
     required this.onStartAddTranslationKey,
     required this.onFinishAddTranslationKey,
     this.selectedKey,
+    required this.onDeleteTranslationKey,
   });
 
   final TreeViewNode<TranslationKeyTreeNode> node;
@@ -247,6 +286,8 @@ class _TranslationKeyTreeNodeWidget extends StatefulWidget {
   /// Passes the new [TranslationKey] or null if this adding process should be canceled
   final void Function(TranslationKey? key) onFinishAddTranslationKey;
   final TranslationKey? selectedKey;
+
+  final void Function(TreeViewNode<TranslationKeyTreeNode> treeNode) onDeleteTranslationKey;
 
   @override
   State<_TranslationKeyTreeNodeWidget> createState() => _TranslationKeyTreeNodeWidgetState();
@@ -301,8 +342,7 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
                           turns: node.isExpanded ? 0.25 : 0.0,
                           duration: animationDuration,
                           curve: animationCurve,
-                          // Renders a unicode right-facing arrow. >
-                          child: const Icon(IconData(0x25BA), size: 14),
+                          child: const Icon(LucideIcons.chevronRight, size: 14),
                         )
                       : null,
                 ),
@@ -367,6 +407,19 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
                       ),
               ),
 
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: _isHovered ? 1 : 0,
+                child: IconButton.ghost(
+                  alignment: .center,
+                  size: .small,
+                  icon: const Icon(Icons.remove),
+                  onPressed: () {
+                    widget.onDeleteTranslationKey(node);
+                  },
+                ),
+              ).withPadding(left: 24),
+
               if (!isLeafNode)
                 AnimatedOpacity(
                   duration: const Duration(milliseconds: 150),
@@ -377,7 +430,7 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
                     icon: const Icon(Icons.add),
                     onPressed: () => widget.onStartAddTranslationKey(node.content.translationKey),
                   ),
-                ).withPadding(left: 24),
+                ),
             ],
           ),
         ),

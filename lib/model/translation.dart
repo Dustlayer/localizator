@@ -76,6 +76,18 @@ class LocalizationProject {
     return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
   }
 
+  LocalizationProject withoutTranslation({required TranslationKey key}) {
+    final newTranslations = translations.remove(key);
+    return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
+  }
+
+  LocalizationProject withoutTranslationsWhere(
+    bool Function(TranslationKey, Translation) predicate,
+  ) {
+    final newTranslations = translations.removeWhere(predicate);
+    return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
+  }
+
   static LocalizationProject parseTranslationJson({
     required Map<String, dynamic> json,
     required TranslationLocale locale,
