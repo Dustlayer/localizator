@@ -13,6 +13,7 @@ class TranslationKey {
   String get key => keyParts.join('.');
 
   TranslationKey get parent => TranslationKey(keyParts.sublist(0, keyParts.length - 1));
+  bool get hasParent => keyParts.isNotEmpty;
 
   factory TranslationKey.fromKey(String key) {
     return TranslationKey(key.split('.').toIList());
@@ -23,7 +24,7 @@ class TranslationKey {
   }
 
   @override
-  String toString() => keyParts.last;
+  String toString() => key;
 
   @override
   bool operator ==(Object other) =>

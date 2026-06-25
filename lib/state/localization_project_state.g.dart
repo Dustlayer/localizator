@@ -35,7 +35,7 @@ final class LocalizationProjectStateProvider
 }
 
 String _$localizationProjectStateHash() =>
-    r'd3ef185fbb8e0645cb6a579844ee4f4e6b0714d7';
+    r'511a3869b497c9335cee7ca9d544f839ed9de890';
 
 abstract class _$LocalizationProjectState
     extends $AsyncNotifier<LocalizationProject?> {

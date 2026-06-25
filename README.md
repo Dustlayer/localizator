@@ -10,8 +10,9 @@ A desktop app that helps editing localization JSON files. Currently only availab
 - Each json file maps to one language
 - See which keys are missing a translation
 - Edit translations
-- Add new keys
+- Add & remove keys
 - Save to files by click top left or [Meta + s] / [Command + s]
+- Handle deep links to open a translation from your IDE
 
 # Build
 

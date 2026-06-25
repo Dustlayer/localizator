@@ -404,9 +404,11 @@ Project _$ProjectFromJson(Map<String, dynamic> json) => Project(
     json['filePaths'],
     (value) => TranslationFile.fromJson(value as Map<String, dynamic>),
   ),
+  gitRepoPath: json['gitRepoPath'] as String?,
 );
 
 Map<String, dynamic> _$ProjectToJson(Project instance) => <String, dynamic>{
   'name': instance.name,
   'filePaths': instance.filePaths.toJson((value) => value),
+  'gitRepoPath': instance.gitRepoPath,
 };

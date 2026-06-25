@@ -23,14 +23,23 @@ class TranslationFile {
 
 @JsonSerializable()
 class Project {
-  const Project({required this.name, required this.filePaths});
+  const Project({required this.name, required this.filePaths, this.gitRepoPath});
 
   final String name;
   final IList<TranslationFile> filePaths;
+  final String? gitRepoPath;
 
   Map<String, dynamic> toJson() => _$ProjectToJson(this);
 
   factory Project.fromJson(Map<String, dynamic> json) => _$ProjectFromJson(json);
 
-  Project withFiles(IList<TranslationFile> filePaths) => Project(name: name, filePaths: filePaths);
+  Project copyWith({String? name, IList<TranslationFile>? filePaths, String? gitRepoPath}) {
+    return Project(
+      name: name ?? this.name,
+      filePaths: filePaths ?? this.filePaths,
+      gitRepoPath: gitRepoPath ?? this.gitRepoPath,
+    );
+  }
+
+  Project withFiles(IList<TranslationFile> filePaths) => copyWith(filePaths: filePaths);
 }

@@ -2,9 +2,11 @@ import 'dart:io';
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:localizator/model/app_config.dart';
 import 'package:localizator/model/project.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/util/list_utils.dart';
+import 'package:localizator/util/path_utils.dart';
 import 'package:localizator/util/toast.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Locale;
 
@@ -101,6 +103,29 @@ class _NewProjectDialogState extends ConsumerState<NewProjectDialog> {
       return;
     }
 
+    AppConfig appConfig;
+    try {
+      appConfig = await ref.read(appConfigStateProvider.future);
+    } catch (e) {
+      if (mounted) {
+        showToast(
+          context: context,
+          builder: buildToast(title: "Fehler", subtitle: "App Config konnte nicht geladen werden"),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    if (appConfig.projects.any((p) => p.name == projectName)) {
+      showToast(
+        context: context,
+        builder: buildToast(title: "Fehler", subtitle: "Projektname ist bereits vergeben"),
+      );
+      return;
+    }
+
     if (widget.filePath != null && _selectedLocale == null) {
       // there is an initial file but no locale was selected
       showToast(
@@ -121,9 +146,9 @@ class _NewProjectDialogState extends ConsumerState<NewProjectDialog> {
     final newProject = Project(
       name: _controller.text.trim(),
       filePaths: translationFile == null ? const IList.empty() : [translationFile].lock,
+      gitRepoPath: (await translationFile?.file.parent.findGitRepoDirectory())?.path,
     );
 
-    final appConfig = await ref.read(appConfigStateProvider.future);
     ref
         .read(appConfigStateProvider.notifier)
         .set(

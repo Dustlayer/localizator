@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
@@ -35,9 +36,15 @@ class AppConfig {
         return AppConfig.fromJson(json);
       }
       return AppConfig(projects: const IList.empty(), lastUsedProject: null);
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Log error or handle corruption here
-      print('Error loading config: $e');
+      log(
+        "Error loading config",
+        error: e,
+        stackTrace: stackTrace,
+        name: 'app.loadConfig', // Helps filter logs
+        level: 1000, // Severe/Error level
+      );
     }
 
     // Return a default empty state if file doesn't exist or load fails
@@ -52,8 +59,14 @@ class AppConfig {
       // Use writeAsString with a temporary file swap for maximum safety,
       // but for a simple local config, a direct write is usually fine.
       await file.writeAsString(jsonString);
-    } catch (e) {
-      print('Error saving config: $e');
+    } catch (e, stackTrace) {
+      log(
+        "Error saving config",
+        error: e,
+        stackTrace: stackTrace,
+        name: 'app.saveConfig', // Helps filter logs
+        level: 1000, // Severe/Error level
+      );
     }
   }
 

@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:app_links/app_links.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/state/localization_project_state.dart';
+import 'package:localizator/state/selected_translation_key.dart';
+import 'package:localizator/util/list_utils.dart';
+import 'package:localizator/util/path_utils.dart';
 import 'package:localizator/util/toast.dart';
 import 'package:localizator/widgets/main_edit_area.dart';
 import 'package:localizator/widgets/top_bar.dart';
@@ -12,15 +18,90 @@ import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'model/translation.dart';
+import 'startup.dart';
 
 void main() {
   runApp(ProviderScope(child: const MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
+  @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    startup(ref);
+    initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void initDeepLinks() {
+    // Subscribe to incoming link events
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (Uri uri) async {
+        // unknown action
+        if (uri.authority != "open") return;
+
+        final appConfig = ref.read(appConfigStateProvider).value;
+        if (appConfig == null) return;
+
+        final openedFromFilePath = uri.queryParameters["file"];
+        if (openedFromFilePath == null) return;
+
+        final gitRepo = await File(openedFromFilePath).parent.findGitRepoDirectory();
+        if (gitRepo == null) return;
+
+        final translationKeyPostfix = uri.queryParameters["key"];
+        final translationKeyPrefix = uri.queryParameters["prefix"];
+        final translationKey = "$translationKeyPrefix.$translationKeyPostfix";
+
+        final project = appConfig.projects.firstWhereOrNull((p) => p.gitRepoPath == gitRepo.path);
+
+        if (project == null) {
+          if (mounted) {
+            showToast(
+              context: context,
+              builder: buildToast(
+                title: "Übersetzung nicht gefunden",
+                subtitle:
+                    "Kein Projekt gefunden. Die Datei mit der Übersetzung muss in einem git Repo liegen.",
+              ),
+            );
+          }
+          return;
+        }
+
+        // set correct project if necessary
+        if (appConfig.lastUsedProject != project) {
+          ref
+              .read(appConfigStateProvider.notifier)
+              .set(appConfig.copyWith(lastUsedProject: project));
+        }
+        ref
+            .read(selectedTranslationKeyProvider.notifier)
+            .set(TranslationKey.fromKey(translationKey));
+      },
+      onError: (err) {
+        if (kDebugMode) {
+          debugPrint('Deep Link Error: $err');
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ShadcnApp(
@@ -43,8 +124,38 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
   final _horizontalController = ScrollController();
   final _treeController = TreeViewController();
   final Set<TranslationKey> _expandedKeys = {};
-  TranslationKey? _selectedKey;
   final ValueNotifier<String> _keyQuery = ValueNotifier("");
+
+  @override
+  void initState() {
+    super.initState();
+    _keyQuery.addListener(() {
+      _verticalController.jumpTo(0);
+      _horizontalController.jumpTo(0);
+    });
+    // make sure keys are expanded when they're selected (e.g. via external link)
+    ref.listenManual(selectedTranslationKeyProvider, (oldTranslationKey, newTranslationKey) {
+      if (newTranslationKey == null) {
+        return;
+      }
+      if (_expandedKeys.contains(newTranslationKey)) {
+        return;
+      }
+      // add translationKey and all their "parents" to expandedKeys
+      _expandedKeys.add(newTranslationKey);
+      if (newTranslationKey.hasParent) {
+        TranslationKey currentKey = newTranslationKey.parent;
+        while (currentKey.hasParent) {
+          if (!_expandedKeys.contains(currentKey)) {
+            _expandedKeys.add(currentKey);
+          }
+          currentKey = currentKey.parent;
+        }
+      }
+
+      setState(() {});
+    });
+  }
 
   @override
   void dispose() {
@@ -55,9 +166,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
   }
 
   void _handleSelectTranslationKey(TranslationKey key) {
-    setState(() {
-      _selectedKey = key;
-    });
+    ref.read(selectedTranslationKeyProvider.notifier).set(key);
   }
 
   @override
@@ -199,7 +308,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                                         node: node,
                                         toggleAnimationStyle: toggleAnimationStyle,
                                         onSelectTranslationKey: _handleSelectTranslationKey,
-                                        selectedKey: _selectedKey,
+                                        selectedKey: ref.watch(selectedTranslationKeyProvider),
                                         onStartAddTranslationKey: (key) {
                                           ref.read(translationKeysAddingProvider.notifier).add(key);
                                         },
@@ -259,7 +368,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
             ),
           ),
           const VerticalDivider(),
-          Expanded(child: MainEditArea(selectedKey: _selectedKey)),
+          Expanded(child: MainEditArea()),
         ],
       ),
     );
@@ -391,18 +500,25 @@ class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWi
                         onTap: () => isLeafNode
                             ? widget.onSelectTranslationKey(node.content.translationKey)
                             : treeViewController.toggleNode(node),
-                        child: Text(
-                          node.content.translationKey.toString(),
-                          style: TextStyle(
-                            decoration: widget.selectedKey == node.content.translationKey
-                                ? .underline
-                                : null,
-                            color: widget.selectedKey == node.content.translationKey
-                                ? Colors.emerald
-                                : !node.content.hasAllKeys
-                                ? Colors.red.shade400
-                                : null,
-                          ),
+                        child: Builder(
+                          builder: (context) {
+                            final nodeTranslationKey = node.content.translationKey;
+                            final childIsSelected =
+                                widget.selectedKey?.key.startsWith(nodeTranslationKey.key) ?? false;
+                            final isSelected =
+                                widget.selectedKey == nodeTranslationKey || childIsSelected;
+                            return Text(
+                              nodeTranslationKey.keyParts.last,
+                              style: TextStyle(
+                                decoration: isSelected ? .underline : null,
+                                color: isSelected
+                                    ? Colors.emerald
+                                    : !node.content.hasAllKeys
+                                    ? Colors.red.shade400
+                                    : null,
+                              ),
+                            );
+                          },
                         ),
                       ),
               ),

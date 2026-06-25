@@ -1,13 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:localizator/model/translation.dart';
+import 'package:localizator/state/selected_translation_key.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 
 import '../state/localization_project_state.dart';
 
 class MainEditArea extends ConsumerStatefulWidget {
-  const MainEditArea({super.key, this.selectedKey});
-
-  final TranslationKey? selectedKey;
+  const MainEditArea({super.key});
 
   @override
   ConsumerState<ConsumerStatefulWidget> createState() => _MainEditAreaState();
@@ -17,14 +16,15 @@ class _MainEditAreaState extends ConsumerState<MainEditArea> {
   @override
   Widget build(BuildContext context) {
     final localizationProject = ref.watch(localizationProjectStateProvider);
+    final selectedKey = ref.watch(selectedTranslationKeyProvider);
     return switch (localizationProject) {
       AsyncError(error: final error) => Center(child: Text("Fehler: $error")),
       AsyncData(value: final localizationProject?) => Center(
-        child: widget.selectedKey == null
+        child: selectedKey == null
             ? const Text("Key auswählen")
             : _TranslationsEditor(
                 localizationProject: localizationProject,
-                translationKey: widget.selectedKey!,
+                translationKey: selectedKey,
               ),
       ),
       AsyncData() => Center(child: Text("Noch keine Dateien")),
