@@ -11,8 +11,13 @@ A desktop app that helps editing localization JSON files. Currently only availab
 - See which keys are missing a translation
 - Edit translations
 - Add & remove keys
-- Save to files by click top left or [Meta + s] / [Command + s]
+- Save to files by clicking top left or [Meta + s] / [Command + s]
 - Handle deep links to open a translation from your IDE
+
+## IDE Integration
+
+- VSCode: https://github.com/Dustlayer/localizator-vscode-linker
+- IntelliJ: https://github.com/silasporth/localizator-intellij-linker
 
 # Build
 
