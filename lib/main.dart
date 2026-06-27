@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:app_links/app_links.dart';
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:localizator/state/app_config.dart';
 import 'package:localizator/state/localization_project_state.dart';
 import 'package:localizator/state/selected_translation_key.dart';
@@ -17,8 +15,10 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide TreeView;
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'logging.dart';
 import 'model/translation.dart';
 import 'startup.dart';
+import 'widgets/translation_key_tree_node.dart';
 
 void main() {
   runApp(ProviderScope(child: const MyApp()));
@@ -54,6 +54,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       (Uri uri) async {
         // unknown action
         if (uri.authority != "open") return;
+        Log.d("Open key link: $uri");
 
         final appConfig = ref.read(appConfigStateProvider).value;
         if (appConfig == null) return;
@@ -66,11 +67,18 @@ class _MyAppState extends ConsumerState<MyApp> {
 
         final translationKeyPostfix = uri.queryParameters["key"];
         final translationKeyPrefix = uri.queryParameters["prefix"];
-        final translationKey = "$translationKeyPrefix.$translationKeyPostfix";
+
+        String translationKey = "$translationKeyPostfix";
+        if (translationKeyPrefix?.isNotEmpty ?? false) {
+          translationKey = "$translationKeyPrefix.$translationKey";
+        }
 
         final project = appConfig.projects.firstWhereOrNull((p) => p.gitRepoPath == gitRepo.path);
 
+        Log.d("Open key '$translationKey'");
+
         if (project == null) {
+          Log.d("Can't find project with gitRepoPath '${gitRepo.path}'");
           if (mounted) {
             showToast(
               context: context,
@@ -125,6 +133,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
   final _treeController = TreeViewController();
   final Set<TranslationKey> _expandedKeys = {};
   final ValueNotifier<String> _keyQuery = ValueNotifier("");
+  final _queryTextController = TextEditingController();
 
   @override
   void initState() {
@@ -134,13 +143,30 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
       _horizontalController.jumpTo(0);
     });
     // make sure keys are expanded when they're selected (e.g. via external link)
-    ref.listenManual(selectedTranslationKeyProvider, (oldTranslationKey, newTranslationKey) {
-      if (newTranslationKey == null) {
-        return;
-      }
-      if (_expandedKeys.contains(newTranslationKey)) {
-        return;
-      }
+    ref.listenManual(
+      selectedTranslationKeyProvider,
+      (oldTranslationKey, newTranslationKey) =>
+          _handleSelectedKeyUpdate(oldTranslationKey, newTranslationKey),
+    );
+  }
+
+  @override
+  void dispose() {
+    _verticalController.dispose();
+    _horizontalController.dispose();
+    _keyQuery.dispose();
+    _queryTextController.dispose();
+    super.dispose();
+  }
+
+  void _handleSelectedKeyUpdate(
+    TranslationKey? oldTranslationKey,
+    TranslationKey? newTranslationKey,
+  ) {
+    if (newTranslationKey == null) {
+      return;
+    }
+    if (!_expandedKeys.contains(newTranslationKey)) {
       // add translationKey and all their "parents" to expandedKeys
       _expandedKeys.add(newTranslationKey);
       if (newTranslationKey.hasParent) {
@@ -152,21 +178,42 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
           currentKey = currentKey.parent;
         }
       }
+    }
 
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _verticalController.dispose();
-    _horizontalController.dispose();
-    _keyQuery.dispose();
-    super.dispose();
+    setState(() {});
   }
 
   void _handleSelectTranslationKey(TranslationKey key) {
     ref.read(selectedTranslationKeyProvider.notifier).set(key);
+  }
+
+  void _handleDeleteTranslationKey(TreeViewNode<TranslationKeyTreeNode> treeNode) {
+    final projectBackup = ref.read(localizationProjectStateProvider).value;
+    if (projectBackup != null) {
+      showToast(
+        context: context,
+        builder: buildToast(
+          title: "Übersetzung gelöscht",
+          subtitle: "Rechts klicken um's rückgängig zu machen",
+          actionLabel: "Rückgängig",
+          onActionClick: () {
+            ref.read(localizationProjectStateProvider.notifier).set(projectBackup);
+          },
+        ),
+      );
+    }
+    // leaf node
+    if (treeNode.children.isEmpty) {
+      ref
+          .read(localizationProjectStateProvider.notifier)
+          .removeTranslation(treeNode.content.translationKey);
+    } else {
+      // delete whole "folder" of keys
+      final folderKey = treeNode.content.translationKey.key;
+      ref
+          .read(localizationProjectStateProvider.notifier)
+          .removeTranslationsWhere((key, _) => key.key.startsWith(folderKey));
+    }
   }
 
   @override
@@ -205,6 +252,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                   children: [
                     Expanded(
                       child: TextField(
+                        controller: _queryTextController,
                         placeholder: const Text("Suche key.key..."),
                         onChanged: (value) => _keyQuery.value = value,
                       ),
@@ -285,6 +333,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                                     controller: _treeController,
                                     tree: tree,
                                     indentation: TreeViewIndentationType.none,
+
                                     verticalDetails: ScrollableDetails.vertical(
                                       controller: _verticalController,
                                       physics: const ClampingScrollPhysics(),
@@ -301,7 +350,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                                       );
                                     },
                                     treeNodeBuilder: (context, node, toggleAnimationStyle) {
-                                      return _TranslationKeyTreeNodeWidget(
+                                      return TranslationKeyTreeNodeWidget(
                                         key: ValueKey(
                                           'row_${node.content.translationKey.key}_${node.content.isAddingKey}',
                                         ),
@@ -317,43 +366,7 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
                                               .read(translationKeysAddingProvider.notifier)
                                               .finishAdding(key, node.content.translationKey);
                                         },
-                                        onDeleteTranslationKey: (treeNode) {
-                                          final projectBackup = ref
-                                              .read(localizationProjectStateProvider)
-                                              .value;
-                                          if (projectBackup != null) {
-                                            showToast(
-                                              context: context,
-                                              builder: buildToast(
-                                                title: "Übersetzung gelöscht",
-                                                subtitle:
-                                                    "Rechts klicken um's rückgängig zu machen",
-                                                actionLabel: "Rückgängig",
-                                                onActionClick: () {
-                                                  ref
-                                                      .read(
-                                                        localizationProjectStateProvider.notifier,
-                                                      )
-                                                      .set(projectBackup);
-                                                },
-                                              ),
-                                            );
-                                          }
-                                          // leaf node
-                                          if (treeNode.children.isEmpty) {
-                                            ref
-                                                .read(localizationProjectStateProvider.notifier)
-                                                .removeTranslation(treeNode.content.translationKey);
-                                          } else {
-                                            // delete whole "folder" of keys
-                                            final folderKey = treeNode.content.translationKey.key;
-                                            ref
-                                                .read(localizationProjectStateProvider.notifier)
-                                                .removeTranslationsWhere(
-                                                  (key, _) => key.key.startsWith(folderKey),
-                                                );
-                                          }
-                                        },
+                                        onDeleteTranslationKey: _handleDeleteTranslationKey,
                                       );
                                     },
                                   );
@@ -370,186 +383,6 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
           const VerticalDivider(),
           Expanded(child: MainEditArea()),
         ],
-      ),
-    );
-  }
-}
-
-class _TranslationKeyTreeNodeWidget extends StatefulWidget {
-  const _TranslationKeyTreeNodeWidget({
-    super.key,
-    required this.node,
-    required this.toggleAnimationStyle,
-    required this.onSelectTranslationKey,
-    required this.onStartAddTranslationKey,
-    required this.onFinishAddTranslationKey,
-    this.selectedKey,
-    required this.onDeleteTranslationKey,
-  });
-
-  final TreeViewNode<TranslationKeyTreeNode> node;
-  final AnimationStyle toggleAnimationStyle;
-  final void Function(TranslationKey key) onSelectTranslationKey;
-  final void Function(TranslationKey key) onStartAddTranslationKey;
-
-  /// Passes the new [TranslationKey] or null if this adding process should be canceled
-  final void Function(TranslationKey? key) onFinishAddTranslationKey;
-  final TranslationKey? selectedKey;
-
-  final void Function(TreeViewNode<TranslationKeyTreeNode> treeNode) onDeleteTranslationKey;
-
-  @override
-  State<_TranslationKeyTreeNodeWidget> createState() => _TranslationKeyTreeNodeWidgetState();
-}
-
-class _TranslationKeyTreeNodeWidgetState extends State<_TranslationKeyTreeNodeWidget> {
-  bool _isHovered = false;
-  late final TextEditingController? _controller = widget.node.content.isAddingKey
-      ? TextEditingController()
-      : null;
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final node = widget.node;
-    final Duration animationDuration =
-        widget.toggleAnimationStyle.duration ?? TreeView.defaultAnimationDuration;
-    final Curve animationCurve =
-        widget.toggleAnimationStyle.curve ?? TreeView.defaultAnimationCurve;
-    final treeViewController = TreeViewController.of(context);
-    final treeNodeDepth = widget.node.depth ?? 0;
-    final isLeafNode = widget.node.children.isEmpty;
-
-    final isVirtualAddingNode = widget.node.content.isAddingKey;
-
-    return MouseRegion(
-      onEnter: (event) => setState(() {
-        _isHovered = true;
-      }),
-      onExit: (event) => setState(() {
-        _isHovered = false;
-      }),
-      child: Padding(
-        padding: .all(8.0),
-        child: Padding(
-          padding: .only(left: treeNodeDepth * 10),
-          child: Row(
-            children: <Widget>[
-              // Icon for parent nodes
-              TreeView.wrapChildToToggleNode(
-                node: node,
-                child: SizedBox.square(
-                  dimension: 30.0,
-                  child: !isLeafNode
-                      ? AnimatedRotation(
-                          key: ValueKey<String>(widget.node.content.translationKey.key),
-                          turns: node.isExpanded ? 0.25 : 0.0,
-                          duration: animationDuration,
-                          curve: animationCurve,
-                          child: const Icon(LucideIcons.chevronRight, size: 14),
-                        )
-                      : null,
-                ),
-              ),
-              // Spacer
-              const SizedBox(width: 8.0),
-              // Content
-              KeyedSubtree(
-                key: ValueKey('content_${node.content.isAddingKey}'),
-                child: isVirtualAddingNode
-                    ? SizedBox(
-                        width: 150,
-                        child: CallbackShortcuts(
-                          bindings: {
-                            const SingleActivator(LogicalKeyboardKey.escape): () {
-                              widget.onFinishAddTranslationKey(null);
-                            },
-                          },
-                          child: TextField(
-                            controller: _controller,
-                            placeholder: const Text("ordner.key"),
-                            features: [
-                              InputFeature.trailing(
-                                IconButton.ghost(
-                                  density: .compact,
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => widget.onFinishAddTranslationKey(null),
-                                ),
-                              ),
-                            ],
-                            onSubmitted: (text) {
-                              FocusScope.of(context).unfocus();
-                              _controller?.text = "";
-                              widget.onFinishAddTranslationKey(
-                                text.trim().isEmpty
-                                    ? null
-                                    : node.content.translationKey.withAddedKeyParts(
-                                        text.split('.').toIList(),
-                                      ),
-                              );
-                            },
-                          ),
-                        ),
-                      )
-                    : GestureDetector(
-                        onTap: () => isLeafNode
-                            ? widget.onSelectTranslationKey(node.content.translationKey)
-                            : treeViewController.toggleNode(node),
-                        child: Builder(
-                          builder: (context) {
-                            final nodeTranslationKey = node.content.translationKey;
-                            final childIsSelected =
-                                widget.selectedKey?.key.startsWith(nodeTranslationKey.key) ?? false;
-                            final isSelected =
-                                widget.selectedKey == nodeTranslationKey || childIsSelected;
-                            return Text(
-                              nodeTranslationKey.keyParts.last,
-                              style: TextStyle(
-                                decoration: isSelected ? .underline : null,
-                                color: isSelected
-                                    ? Colors.emerald
-                                    : !node.content.hasAllKeys
-                                    ? Colors.red.shade400
-                                    : null,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-              ),
-
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: _isHovered ? 1 : 0,
-                child: IconButton.ghost(
-                  alignment: .center,
-                  size: .small,
-                  icon: const Icon(Icons.remove),
-                  onPressed: () {
-                    widget.onDeleteTranslationKey(node);
-                  },
-                ),
-              ).withPadding(left: 24),
-
-              if (!isLeafNode)
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  opacity: _isHovered ? 1 : 0,
-                  child: IconButton.ghost(
-                    alignment: .center,
-                    size: .small,
-                    icon: const Icon(Icons.add),
-                    onPressed: () => widget.onStartAddTranslationKey(node.content.translationKey),
-                  ),
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }

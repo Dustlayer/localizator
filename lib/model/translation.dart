@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:localizator/model/translation_locale.dart';
@@ -12,7 +13,11 @@ class TranslationKey {
 
   String get key => keyParts.join('.');
 
-  TranslationKey get parent => TranslationKey(keyParts.sublist(0, keyParts.length - 1));
+  /// Depth in the tree
+  int get depth => keyParts.length;
+
+  TranslationKey get parent =>
+      TranslationKey(keyParts.sublist(0, math.max(0, keyParts.length - 1)));
   bool get hasParent => keyParts.isNotEmpty;
 
   factory TranslationKey.fromKey(String key) {
