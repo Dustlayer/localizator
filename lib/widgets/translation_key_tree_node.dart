@@ -69,135 +69,129 @@ class _TranslationKeyTreeNodeWidgetState extends State<TranslationKeyTreeNodeWid
       }),
       child: ConstrainedBox(
         constraints: .loose(Size(1000, double.infinity)),
-        child: OverflowBox(
-          alignment: Alignment.centerLeft,
-          minWidth: 250,
-          maxWidth: 2000,
+        child: Padding(
+          padding: .all(8.0),
           child: Padding(
-            padding: .all(8.0),
-            child: Padding(
-              padding: .only(left: treeNodeDepth * 10),
-              child: Row(
-                mainAxisSize: .min,
-                children: <Widget>[
-                  // Icon for parent nodes
-                  TreeView.wrapChildToToggleNode(
-                    node: node,
-                    child: SizedBox.square(
-                      dimension: 30.0,
-                      child: !isLeafNode
-                          ? AnimatedRotation(
-                              key: ValueKey<String>(widget.node.content.translationKey.key),
-                              turns: node.isExpanded ? 0.25 : 0.0,
-                              duration: animationDuration,
-                              curve: animationCurve,
-                              child: const Icon(LucideIcons.chevronRight, size: 14),
-                            )
-                          : null,
-                    ),
-                  ),
-                  // Spacer
-                  const SizedBox(width: 8.0),
-                  // Content
-                  KeyedSubtree(
-                    key: ValueKey('content_${node.content.isAddingKey}'),
-                    child: isVirtualAddingNode
-                        ? SizedBox(
-                            width: 150,
-                            child: CallbackShortcuts(
-                              bindings: {
-                                const SingleActivator(LogicalKeyboardKey.escape): () {
-                                  widget.onFinishAddTranslationKey(null);
-                                },
-                              },
-                              child: TextField(
-                                controller: _controller,
-                                placeholder: const Text("ordner.key"),
-                                features: [
-                                  InputFeature.trailing(
-                                    IconButton.ghost(
-                                      density: .compact,
-                                      icon: const Icon(Icons.close),
-                                      onPressed: () => widget.onFinishAddTranslationKey(null),
-                                    ),
-                                  ),
-                                ],
-                                onSubmitted: (text) {
-                                  FocusScope.of(context).unfocus();
-                                  _controller?.text = "";
-                                  widget.onFinishAddTranslationKey(
-                                    text.trim().isEmpty
-                                        ? null
-                                        : node.content.translationKey.withAddedKeyParts(
-                                            text.split('.').toIList(),
-                                          ),
-                                  );
-                                },
-                              ),
-                            ),
+            padding: .only(left: treeNodeDepth * 10),
+            child: Row(
+              mainAxisSize: .min,
+              children: <Widget>[
+                // Icon for parent nodes
+                TreeView.wrapChildToToggleNode(
+                  node: node,
+                  child: SizedBox.square(
+                    dimension: 30.0,
+                    child: !isLeafNode
+                        ? AnimatedRotation(
+                            key: ValueKey<String>(widget.node.content.translationKey.key),
+                            turns: node.isExpanded ? 0.25 : 0.0,
+                            duration: animationDuration,
+                            curve: animationCurve,
+                            child: const Icon(LucideIcons.chevronRight, size: 14),
                           )
-                        : GestureDetector(
-                            onTap: () => isLeafNode
-                                ? widget.onSelectTranslationKey(node.content.translationKey)
-                                : treeViewController.toggleNode(node),
-                            onSecondaryTap: () {
-                              showAddNewKeyDialog(context, parent: node.content.translationKey);
+                        : null,
+                  ),
+                ),
+                // Spacer
+                const SizedBox(width: 8.0),
+                // Content
+                KeyedSubtree(
+                  key: ValueKey('content_${node.content.isAddingKey}'),
+                  child: isVirtualAddingNode
+                      ? SizedBox(
+                          width: 150,
+                          child: CallbackShortcuts(
+                            bindings: {
+                              const SingleActivator(LogicalKeyboardKey.escape): () {
+                                widget.onFinishAddTranslationKey(null);
+                              },
                             },
-                            child: Builder(
-                              builder: (context) {
-                                final nodeTranslationKey = node.content.translationKey;
-                                final selectedKeyDepth = widget.selectedKey?.depth ?? 0;
-                                final childIsSelected =
-                                    selectedKeyDepth > nodeTranslationKey.depth &&
-                                    (widget.selectedKey?.key.startsWith(nodeTranslationKey.key) ??
-                                        false);
-
-                                final isSelected =
-                                    widget.selectedKey == nodeTranslationKey || childIsSelected;
-                                return Text(
-                                  nodeTranslationKey.keyParts.last,
-                                  overflow: .ellipsis,
-                                  style: TextStyle(
-                                    decoration: isSelected ? .underline : null,
-                                    color: isSelected
-                                        ? Colors.emerald
-                                        : !node.content.hasAllKeys
-                                        ? Colors.red.shade400
-                                        : null,
+                            child: TextField(
+                              controller: _controller,
+                              placeholder: const Text("ordner.key"),
+                              features: [
+                                InputFeature.trailing(
+                                  IconButton.ghost(
+                                    density: .compact,
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () => widget.onFinishAddTranslationKey(null),
                                   ),
+                                ),
+                              ],
+                              onSubmitted: (text) {
+                                FocusScope.of(context).unfocus();
+                                _controller?.text = "";
+                                widget.onFinishAddTranslationKey(
+                                  text.trim().isEmpty
+                                      ? null
+                                      : node.content.translationKey.withAddedKeyParts(
+                                          text.split('.').toIList(),
+                                        ),
                                 );
                               },
                             ),
                           ),
-                  ),
+                        )
+                      : GestureDetector(
+                          onTap: () => isLeafNode
+                              ? widget.onSelectTranslationKey(node.content.translationKey)
+                              : treeViewController.toggleNode(node),
+                          onSecondaryTap: () {
+                            showAddNewKeyDialog(context, parent: node.content.translationKey);
+                          },
+                          child: Builder(
+                            builder: (context) {
+                              final nodeTranslationKey = node.content.translationKey;
+                              final selectedKeyDepth = widget.selectedKey?.depth ?? 0;
+                              final childIsSelected =
+                                  selectedKeyDepth > nodeTranslationKey.depth &&
+                                  (widget.selectedKey?.key.startsWith(nodeTranslationKey.key) ??
+                                      false);
 
+                              final isSelected =
+                                  widget.selectedKey == nodeTranslationKey || childIsSelected;
+                              return Text(
+                                nodeTranslationKey.keyParts.last,
+                                overflow: .ellipsis,
+                                style: TextStyle(
+                                  decoration: isSelected ? .underline : null,
+                                  color: isSelected
+                                      ? Colors.emerald
+                                      : !node.content.hasAllKeys
+                                      ? Colors.red.shade400
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: _isHovered ? 1 : 0,
+                  child: IconButton.ghost(
+                    alignment: .center,
+                    size: .small,
+                    icon: const Icon(Icons.remove),
+                    onPressed: () {
+                      widget.onDeleteTranslationKey(node);
+                    },
+                  ),
+                ).withPadding(left: 24),
+
+                if (!isLeafNode)
                   AnimatedOpacity(
                     duration: const Duration(milliseconds: 150),
                     opacity: _isHovered ? 1 : 0,
                     child: IconButton.ghost(
                       alignment: .center,
                       size: .small,
-                      icon: const Icon(Icons.remove),
-                      onPressed: () {
-                        widget.onDeleteTranslationKey(node);
-                      },
+                      icon: const Icon(Icons.add),
+                      onPressed: () => widget.onStartAddTranslationKey(node.content.translationKey),
                     ),
-                  ).withPadding(left: 24),
-
-                  if (!isLeafNode)
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: _isHovered ? 1 : 0,
-                      child: IconButton.ghost(
-                        alignment: .center,
-                        size: .small,
-                        icon: const Icon(Icons.add),
-                        onPressed: () =>
-                            widget.onStartAddTranslationKey(node.content.translationKey),
-                      ),
-                    ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),

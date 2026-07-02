@@ -42,7 +42,7 @@ abstract class _$LocalizationProjectState
   FutureOr<LocalizationProject?> build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref =
         this.ref
             as $Ref<AsyncValue<LocalizationProject?>, LocalizationProject?>;
@@ -57,7 +57,7 @@ abstract class _$LocalizationProjectState
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }
 
@@ -106,7 +106,7 @@ abstract class _$TranslationKeysAdding extends $Notifier<ISet<TranslationKey>> {
   ISet<TranslationKey> build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<ISet<TranslationKey>, ISet<TranslationKey>>;
     final element =
         ref.element
@@ -116,6 +116,6 @@ abstract class _$TranslationKeysAdding extends $Notifier<ISet<TranslationKey>> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }
