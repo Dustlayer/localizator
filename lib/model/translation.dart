@@ -230,7 +230,7 @@ extension LocalizationTree on LocalizationProject {
   /// "virtual" node with an input field, where the user can input a new node.
   List<TreeViewNode<TranslationKeyTreeNode>> toTreeNodes({
     required ISet<TranslationKey> keysBeingAdded,
-    required Set<TranslationKey> expandedKeys,
+    required ISet<TranslationKey> expandedKeys,
     String query = "",
   }) {
     // Build a nested helper map
@@ -264,7 +264,7 @@ extension LocalizationTree on LocalizationProject {
     Map<String, dynamic> map,
     ISet<TranslationKey> keysBeingAdded,
     IList<String> parentPath,
-    Set<TranslationKey> expandedKeys,
+    ISet<TranslationKey> expandedKeys,
   ) {
     return map.entries.map((entry) {
       final currentPath = parentPath.add(entry.key);
