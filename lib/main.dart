@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:localizator/state/app_config.dart';
+import 'package:localizator/state/localization_project_state.dart';
 import 'package:localizator/state/selected_translation_key.dart';
 import 'package:localizator/util/list_utils.dart';
 import 'package:localizator/util/path_utils.dart';
+import 'package:localizator/util/reload_localization_project.dart';
 import 'package:localizator/util/toast.dart';
 import 'package:localizator/widgets/translation_key_tree.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -27,21 +29,53 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
+
+  final _rootKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     startup(ref);
     initDeepLinks();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check the git branch whenever the window becomes active again so the translations reload
+    // if the branch changed while the app wasn't focused.
+    if (state == AppLifecycleState.resumed) {
+      _reloadIfGitBranchChanged();
+    }
+  }
+
+  Future<void> _reloadIfGitBranchChanged() async {
+    final hasChanged = await ref
+        .read(localizationProjectStateProvider.notifier)
+        .hasGitBranchChanged();
+    if (!hasChanged ||
+        _rootKey.currentContext == null ||
+        !(_rootKey.currentContext?.mounted ?? false)) {
+      return;
+    }
+
+    Log.d("Git branch changed while unfocused, reloading translations");
+    await reloadLocalizationProjectWithConfirmation(
+      _rootKey.currentContext!,
+      ref,
+      body:
+          "Der Git-Branch wurde gewechselt. Das verwirft aktuelle Änderungen, die noch nicht gespeichert wurden.",
+    );
   }
 
   void initDeepLinks() {
@@ -110,7 +144,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   Widget build(BuildContext context) {
     return ShadcnApp(
       title: 'Flutter Demo',
-      home: const TranslationKeyTree(),
+      home: TranslationKeyTree(key: _rootKey),
       theme: ThemeData(colorScheme: ColorSchemes.darkSlate),
     );
   }

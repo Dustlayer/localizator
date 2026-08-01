@@ -35,7 +35,7 @@ final class LocalizationProjectStateProvider
 }
 
 String _$localizationProjectStateHash() =>
-    r'511a3869b497c9335cee7ca9d544f839ed9de890';
+    r'ec266411fa515c975bf67ee4721bf0485f4c9c57';
 
 abstract class _$LocalizationProjectState
     extends $AsyncNotifier<LocalizationProject?> {
@@ -54,6 +54,76 @@ abstract class _$LocalizationProjectState
                 LocalizationProject?
               >,
               AsyncValue<LocalizationProject?>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The git branch that was checked out the last time the translations were (re)loaded, so a
+/// later branch switch made outside the app (e.g. in a terminal) can be detected - see
+/// [LocalizationProjectState.hasGitBranchChanged]. `null` if the current project isn't in a git
+/// repo, or no project is loaded.
+
+@ProviderFor(CurrentGitBranch)
+final currentGitBranchProvider = CurrentGitBranchProvider._();
+
+/// The git branch that was checked out the last time the translations were (re)loaded, so a
+/// later branch switch made outside the app (e.g. in a terminal) can be detected - see
+/// [LocalizationProjectState.hasGitBranchChanged]. `null` if the current project isn't in a git
+/// repo, or no project is loaded.
+final class CurrentGitBranchProvider
+    extends $NotifierProvider<CurrentGitBranch, String?> {
+  /// The git branch that was checked out the last time the translations were (re)loaded, so a
+  /// later branch switch made outside the app (e.g. in a terminal) can be detected - see
+  /// [LocalizationProjectState.hasGitBranchChanged]. `null` if the current project isn't in a git
+  /// repo, or no project is loaded.
+  CurrentGitBranchProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'currentGitBranchProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$currentGitBranchHash();
+
+  @$internal
+  @override
+  CurrentGitBranch create() => CurrentGitBranch();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$currentGitBranchHash() => r'70629664a7ff8fb6baecc7d79fbd033586ae4677';
+
+/// The git branch that was checked out the last time the translations were (re)loaded, so a
+/// later branch switch made outside the app (e.g. in a terminal) can be detected - see
+/// [LocalizationProjectState.hasGitBranchChanged]. `null` if the current project isn't in a git
+/// repo, or no project is loaded.
+
+abstract class _$CurrentGitBranch extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
               Object?,
               Object?
             >;

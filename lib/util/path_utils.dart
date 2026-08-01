@@ -22,4 +22,17 @@ extension DirectoryUtils on Directory {
     // Recursive call to keep searching upwards
     return _findGitRepoDirectory(parentDir);
   }
+
+  /// The name of the currently checked out branch of the git repo at this directory, or `null`
+  /// if it can't be determined (not a repo, detached HEAD, `git` not on PATH, ...).
+  Future<String?> currentGitBranch() async {
+    try {
+      final result = await Process.run('git', ['branch', '--show-current'], workingDirectory: path);
+      if (result.exitCode != 0) return null;
+      final branch = (result.stdout as String).trim();
+      return branch.isEmpty ? null : branch;
+    } catch (_) {
+      return null;
+    }
+  }
 }

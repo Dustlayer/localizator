@@ -12,6 +12,7 @@ import '../dialogs/confirm_dialog.dart';
 import '../dialogs/new_project_dialog.dart';
 import '../model/project.dart';
 import '../util/list_utils.dart';
+import '../util/reload_localization_project.dart';
 import '../util/toast.dart';
 
 class TopBar extends ConsumerStatefulWidget {
@@ -90,6 +91,7 @@ class _TopBarState extends ConsumerState<TopBar> {
   Widget build(BuildContext context) {
     final appConfig = ref.watch(appConfigStateProvider).value;
     final projects = appConfig?.projects ?? const IList.empty();
+    final gitBranch = ref.watch(currentGitBranchProvider);
     return CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
@@ -126,6 +128,22 @@ class _TopBarState extends ConsumerState<TopBar> {
             ),
             trailingGap: 8,
             trailing: [
+              if (gitBranch != null)
+                Tooltip(
+                  tooltip: (context) =>
+                      TooltipContainer(child: Text("Aktueller Git-Branch $gitBranch")),
+                  child: SizedBox(
+                    width: 144,
+                    child: Row(
+                      mainAxisAlignment: .end,
+                      spacing: 4,
+                      children: [
+                        const Icon(LucideIcons.gitBranch, size: 16),
+                        Flexible(child: Text(gitBranch, overflow: .ellipsis)),
+                      ],
+                    ),
+                  ),
+                ),
               Select<Project>(
                 constraints: const BoxConstraints(minWidth: 200),
                 value: appConfig?.lastUsedProject,
@@ -159,18 +177,7 @@ class _TopBarState extends ConsumerState<TopBar> {
                 tooltip: (context) => TooltipContainer(child: const Text("Dateien neu laden")),
                 child: IconButton.primary(
                   icon: const Icon(LucideIcons.refreshCw),
-                  onPressed: () async {
-                    if (ref.read(localizationProjectStateProvider).value?.isDirty ?? false) {
-                      final confirmed = await showConfirmDialog(
-                        context,
-                        title: "Neu laden?",
-                        body:
-                            "Das verwirft aktuelle Änderungen, die noch nicht gespeichert wurden.",
-                      );
-                      if (!confirmed) return;
-                    }
-                    ref.invalidate(localizationProjectStateProvider);
-                  },
+                  onPressed: () => reloadLocalizationProjectWithConfirmation(context, ref),
                 ),
               ),
               Tooltip(
