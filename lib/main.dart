@@ -52,8 +52,8 @@ class _MyAppState extends ConsumerState<MyApp> {
         if (uri.authority != "open") return;
         Log.d("Open key link: $uri");
 
-        final appConfig = ref.read(appConfigStateProvider).value;
-        if (appConfig == null) return;
+        // await as on a cold start this fires before the config is done loading
+        final appConfig = await ref.read(appConfigStateProvider.future);
 
         final openedFromFilePath = uri.queryParameters["file"];
         if (openedFromFilePath == null) return;
@@ -115,4 +115,3 @@ class _MyAppState extends ConsumerState<MyApp> {
     );
   }
 }
-
