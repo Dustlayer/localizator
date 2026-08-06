@@ -22,9 +22,12 @@ class _MainEditAreaState extends ConsumerState<MainEditArea> {
       AsyncData(value: final localizationProject?) => Center(
         child: selectedKey == null
             ? const Text("Key auswählen")
-            : _TranslationsEditor(
-                localizationProject: localizationProject,
-                translationKey: selectedKey,
+            : Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: _TranslationsEditor(
+                  localizationProject: localizationProject,
+                  translationKey: selectedKey,
+                ),
               ),
       ),
       AsyncData() => Center(child: Text("Noch keine Dateien")),
@@ -44,20 +47,41 @@ class _TranslationsEditor extends ConsumerStatefulWidget {
 }
 
 class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
+  void _handleAddMissingKey() {
+    ref
+        .read(localizationProjectStateProvider.notifier)
+        .updateTranslation(widget.translationKey, Translation(key: widget.translationKey));
+  }
+
   @override
   Widget build(BuildContext context) {
     final locales = widget.localizationProject.languages;
     final translations = widget.localizationProject.translations[widget.translationKey];
     if (translations == null) {
-      return Center(child: Text("Schlüssel nicht gefunden"));
+      return Center(
+        child: Column(
+          mainAxisSize: .min,
+          spacing: 8,
+          children: [
+            SelectableText("Schlüssel '${widget.translationKey.key}' nicht gefunden"),
+            PrimaryButton(
+              onPressed: _handleAddMissingKey,
+              child: const Text("Schlüssel hinzufügen"),
+            ),
+          ],
+        ),
+      );
     }
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        mainAxisAlignment: .start,
-        crossAxisAlignment: .stretch,
-        spacing: 8,
-        children: locales.map((locale) {
+    return Column(
+      mainAxisAlignment: .start,
+      crossAxisAlignment: .stretch,
+      spacing: 8,
+      children: [
+        SelectableText(
+          widget.translationKey.key,
+          style: const TextStyle(fontSize: 18, fontWeight: .w500),
+        ),
+        ...locales.map((locale) {
           final translatedText = translations.translations[locale];
           return FormField(
             key: InputKey("${widget.translationKey.key}-${locale.locale}"),
@@ -74,8 +98,8 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
               },
             ),
           );
-        }).toList(),
-      ),
+        }),
+      ],
     );
   }
 }
