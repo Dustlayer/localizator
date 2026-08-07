@@ -76,7 +76,7 @@ class _AddTranslationKeyDialogState extends ConsumerState<AddTranslationKeyDialo
 
     ref
         .read(localizationProjectStateProvider.notifier)
-        .updateTranslation(safeKey, Translation(key: safeKey));
+        .updateTranslation(safeKey, SimpleTranslation(key: safeKey));
 
     Navigator.pop(context, safeKey);
   }

@@ -8,9 +8,27 @@ import 'package:localizator/util/path_utils.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../constants.dart';
+import '../model/pluralization_strategy.dart';
 import '../model/translation.dart';
 
 part 'localization_project_state.g.dart';
+
+/// Which [PluralizationStrategy] is used to (de)serialize pluralized keys when parsing and
+/// saving translation files.
+@Riverpod(keepAlive: true)
+PluralizationStrategy pluralizationStrategy(Ref ref) => const ReactI18nextPluralizationStrategy();
+
+/// Bumped every time [LocalizationProjectState.build] (re-)reads the translations from disk -
+/// as opposed to a local edit via [LocalizationProjectState.updateTranslation] etc., which
+/// updates the state directly without re-running [build]. Forces the UI to pick up the
+/// freshly-read value instead of keeping whatever they last displayed.
+@Riverpod(keepAlive: true)
+class LocalizationProjectReloadGeneration extends _$LocalizationProjectReloadGeneration {
+  @override
+  int build() => 0;
+
+  void increment() => state++;
+}
 
 @Riverpod(keepAlive: true)
 class LocalizationProjectState extends _$LocalizationProjectState {
@@ -29,6 +47,8 @@ class LocalizationProjectState extends _$LocalizationProjectState {
         .read(currentGitBranchProvider.notifier)
         .set(gitRepoPath == null ? null : await Directory(gitRepoPath).currentGitBranch());
 
+    final pluralizationStrategy = ref.watch(pluralizationStrategyProvider);
+
     LocalizationProject? project;
     for (final translationFile in appConfig.lastUsedProject!.filePaths) {
       final file = File(translationFile.path);
@@ -38,8 +58,13 @@ class LocalizationProjectState extends _$LocalizationProjectState {
         json: json,
         locale: translationFile.locale,
         existingProject: project,
+        pluralizationStrategy: pluralizationStrategy,
       );
     }
+
+    // Safe to modify another provider here (unlike at the top of build()): we're past the
+    // initialization portion of this build() call, having already awaited above.
+    ref.read(localizationProjectReloadGenerationProvider.notifier).increment();
     return project;
   }
 
@@ -93,7 +118,10 @@ class LocalizationProjectState extends _$LocalizationProjectState {
       );
       if (translationFile == null) continue;
 
-      final jsonString = localizationProject.toJsonString(locale);
+      final jsonString = localizationProject.toJsonString(
+        locale,
+        pluralizationStrategy: ref.read(pluralizationStrategyProvider),
+      );
       await translationFile.file.writeAsString(jsonString);
     }
 
@@ -145,7 +173,7 @@ class TranslationKeysAdding extends _$TranslationKeysAdding {
           TranslationKey(
             newTranslationKey.keyParts.where((p) => p != Constants.addingKey).toIList(),
           ),
-          Translation(key: newTranslationKey),
+          SimpleTranslation(key: newTranslationKey),
         );
   }
 }

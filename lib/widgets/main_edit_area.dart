@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:localizator/model/translation.dart';
 import 'package:localizator/state/selected_translation_key.dart';
@@ -50,14 +51,36 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
   void _handleAddMissingKey() {
     ref
         .read(localizationProjectStateProvider.notifier)
-        .updateTranslation(widget.translationKey, Translation(key: widget.translationKey));
+        .updateTranslation(widget.translationKey, SimpleTranslation(key: widget.translationKey));
+  }
+
+  void _handlePluralize() {
+    final translation = widget.localizationProject.translations[widget.translationKey];
+    if (translation is! SimpleTranslation) return;
+
+    ref
+        .read(localizationProjectStateProvider.notifier)
+        .updateTranslation(widget.translationKey, translation.pluralized());
+  }
+
+  void _handleDepluralize() {
+    final translation = widget.localizationProject.translations[widget.translationKey];
+    if (translation is! PluralizedTranslation) return;
+
+    ref
+        .read(localizationProjectStateProvider.notifier)
+        .updateTranslation(widget.translationKey, translation.depluralized());
   }
 
   @override
   Widget build(BuildContext context) {
     final locales = widget.localizationProject.languages;
-    final translations = widget.localizationProject.translations[widget.translationKey];
-    if (translations == null) {
+    final translation = widget.localizationProject.translations[widget.translationKey];
+    // Folded into the TextFields' keys below so a reload from disk (which bumps this) forces
+    // them to drop their stale displayed value and pick up initialValue fresh - see the
+    // provider's doc comment for why a local edit doesn't also trigger this.
+    final reloadGeneration = ref.watch(localizationProjectReloadGenerationProvider);
+    if (translation == null) {
       return Center(
         child: Column(
           mainAxisSize: .min,
@@ -72,34 +95,90 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
         ),
       );
     }
-    return Column(
-      mainAxisAlignment: .start,
-      crossAxisAlignment: .stretch,
-      spacing: 8,
-      children: [
-        SelectableText(
-          widget.translationKey.key,
-          style: const TextStyle(fontSize: 18, fontWeight: .w500),
-        ),
-        ...locales.map((locale) {
-          final translatedText = translations.translations[locale];
-          return FormField(
-            key: InputKey("${widget.translationKey.key}-${locale.locale}"),
-            label: Text(locale.name),
-            child: TextField(
-              initialValue: translatedText,
-              onChanged: (value) {
-                ref
-                    .read(localizationProjectStateProvider.notifier)
-                    .updateTranslation(
-                      widget.translationKey,
-                      translations.withUpdatedTranslation(locale, value),
-                    );
-              },
+    final isPluralized = translation is PluralizedTranslation;
+    return Align(
+      alignment: .topCenter,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: .start,
+          crossAxisAlignment: .stretch,
+          spacing: 8,
+          children: [
+            Row(
+              spacing: 8,
+              children: [
+                Flexible(
+                  child: SelectableText(
+                    widget.translationKey.key,
+                    style: const TextStyle(fontSize: 18, fontWeight: .w500),
+                    maxLines: 2,
+                  ),
+                ),
+
+                Button.secondary(
+                  onPressed: isPluralized ? _handleDepluralize : _handlePluralize,
+                  child: Text(isPluralized ? "Depluralisieren" : "Pluralisieren"),
+                ),
+              ],
             ),
-          );
-        }),
-      ],
+            ...switch (translation) {
+              PluralizedTranslation(:final pluralTranslations) => locales.map((locale) {
+                final forms = pluralTranslations[locale] ?? const IMap.empty();
+                return Card(
+                  child: Column(
+                    crossAxisAlignment: .stretch,
+                    spacing: 8,
+                    children: [
+                      Text(locale.name, style: const TextStyle(fontWeight: .w500)),
+                      ...PluralCategory.values.map((category) {
+                        return FormField(
+                          key: InputKey(
+                            "${widget.translationKey.key}-${locale.locale}-${category.name}-$reloadGeneration",
+                          ),
+                          label: Text(category.label),
+                          child: TextField(
+                            initialValue: forms[category],
+                            onChanged: (value) {
+                              ref
+                                  .read(localizationProjectStateProvider.notifier)
+                                  .updateTranslation(
+                                    widget.translationKey,
+                                    translation.withUpdatedPluralTranslation(
+                                      locale,
+                                      category,
+                                      value,
+                                    ),
+                                  );
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }),
+              SimpleTranslation(translations: final plainTranslations) => locales.map((locale) {
+                final translatedText = plainTranslations[locale];
+                return FormField(
+                  key: InputKey("${widget.translationKey.key}-${locale.locale}-$reloadGeneration"),
+                  label: Text(locale.name),
+                  child: TextField(
+                    initialValue: translatedText,
+                    onChanged: (value) {
+                      ref
+                          .read(localizationProjectStateProvider.notifier)
+                          .updateTranslation(
+                            widget.translationKey,
+                            translation.withUpdatedTranslation(locale, value),
+                          );
+                    },
+                  ),
+                );
+              }),
+            },
+          ],
+        ),
+      ),
     );
   }
 }

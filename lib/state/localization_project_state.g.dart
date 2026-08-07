@@ -8,6 +8,139 @@ part of 'localization_project_state.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Which [PluralizationStrategy] is used to detect/(de)serialize pluralized keys when parsing
+/// and saving translation files.
+
+@ProviderFor(pluralizationStrategy)
+final pluralizationStrategyProvider = PluralizationStrategyProvider._();
+
+/// Which [PluralizationStrategy] is used to detect/(de)serialize pluralized keys when parsing
+/// and saving translation files.
+
+final class PluralizationStrategyProvider
+    extends
+        $FunctionalProvider<
+          PluralizationStrategy,
+          PluralizationStrategy,
+          PluralizationStrategy
+        >
+    with $Provider<PluralizationStrategy> {
+  /// Which [PluralizationStrategy] is used to detect/(de)serialize pluralized keys when parsing
+  /// and saving translation files.
+  PluralizationStrategyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'pluralizationStrategyProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$pluralizationStrategyHash();
+
+  @$internal
+  @override
+  $ProviderElement<PluralizationStrategy> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PluralizationStrategy create(Ref ref) {
+    return pluralizationStrategy(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PluralizationStrategy value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PluralizationStrategy>(value),
+    );
+  }
+}
+
+String _$pluralizationStrategyHash() =>
+    r'0ef9735060ea9cd438e4d5f07a289f3c3c4e5194';
+
+/// Bumped every time [LocalizationProjectState.build] (re-)reads the translations from disk -
+/// as opposed to a local edit via [LocalizationProjectState.updateTranslation] etc., which
+/// updates the state directly without re-running [build]. The editor's text fields fold this
+/// into their widget keys so a reload forces them to pick up the freshly-read value instead of
+/// keeping whatever they last displayed - see [MainEditArea].
+
+@ProviderFor(LocalizationProjectReloadGeneration)
+final localizationProjectReloadGenerationProvider =
+    LocalizationProjectReloadGenerationProvider._();
+
+/// Bumped every time [LocalizationProjectState.build] (re-)reads the translations from disk -
+/// as opposed to a local edit via [LocalizationProjectState.updateTranslation] etc., which
+/// updates the state directly without re-running [build]. The editor's text fields fold this
+/// into their widget keys so a reload forces them to pick up the freshly-read value instead of
+/// keeping whatever they last displayed - see [MainEditArea].
+final class LocalizationProjectReloadGenerationProvider
+    extends $NotifierProvider<LocalizationProjectReloadGeneration, int> {
+  /// Bumped every time [LocalizationProjectState.build] (re-)reads the translations from disk -
+  /// as opposed to a local edit via [LocalizationProjectState.updateTranslation] etc., which
+  /// updates the state directly without re-running [build]. The editor's text fields fold this
+  /// into their widget keys so a reload forces them to pick up the freshly-read value instead of
+  /// keeping whatever they last displayed - see [MainEditArea].
+  LocalizationProjectReloadGenerationProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'localizationProjectReloadGenerationProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$localizationProjectReloadGenerationHash();
+
+  @$internal
+  @override
+  LocalizationProjectReloadGeneration create() =>
+      LocalizationProjectReloadGeneration();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$localizationProjectReloadGenerationHash() =>
+    r'5f185baa55443a9e2764b51cc76ba9971023c688';
+
+/// Bumped every time [LocalizationProjectState.build] (re-)reads the translations from disk -
+/// as opposed to a local edit via [LocalizationProjectState.updateTranslation] etc., which
+/// updates the state directly without re-running [build]. The editor's text fields fold this
+/// into their widget keys so a reload forces them to pick up the freshly-read value instead of
+/// keeping whatever they last displayed - see [MainEditArea].
+
+abstract class _$LocalizationProjectReloadGeneration extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
 
 @ProviderFor(LocalizationProjectState)
 final localizationProjectStateProvider = LocalizationProjectStateProvider._();
@@ -35,7 +168,7 @@ final class LocalizationProjectStateProvider
 }
 
 String _$localizationProjectStateHash() =>
-    r'ec266411fa515c975bf67ee4721bf0485f4c9c57';
+    r'c412dffa58d1cf8384cf674bbb06d0c00ef2a9df';
 
 abstract class _$LocalizationProjectState
     extends $AsyncNotifier<LocalizationProject?> {

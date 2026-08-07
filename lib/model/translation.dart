@@ -6,6 +6,8 @@ import 'package:localizator/model/translation_locale.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 import '../constants.dart';
+import '../util/list_utils.dart';
+import 'pluralization_strategy.dart';
 
 class TranslationKey {
   const TranslationKey(this.keyParts);
@@ -28,6 +30,11 @@ class TranslationKey {
     return TranslationKey(keyParts.addAll(parts));
   }
 
+  /// Appends [suffix] to the last key part, e.g. `foo.bar` with `_one` becomes `foo.bar_one`.
+  TranslationKey withSuffix(String suffix) {
+    return TranslationKey(keyParts.sublist(0, keyParts.length - 1).add('${keyParts.last}$suffix'));
+  }
+
   @override
   String toString() => key;
 
@@ -40,19 +47,148 @@ class TranslationKey {
   int get hashCode => key.hashCode;
 }
 
-class Translation {
-  Translation({required this.key, this.translations = const IMap.empty()});
+/// The plural categories used by react-i18next (and ICU) for pluralization.
+enum PluralCategory { zero, one, two, few, many, other }
+
+extension PluralCategoryLabel on PluralCategory {
+  String get label => switch (this) {
+    PluralCategory.zero => 'Zero',
+    PluralCategory.one => 'One',
+    PluralCategory.two => 'Two',
+    PluralCategory.few => 'Few',
+    PluralCategory.many => 'Many',
+    PluralCategory.other => 'Other',
+  };
+}
+
+/// A single translation key's content across all locales in the project - either a plain
+/// [SimpleTranslation] or a [PluralizedTranslation] with separate forms per [PluralCategory].
+///
+/// The UI shows different inputs depending on whether a [SimpleTranslation] or
+/// [PluralizedTranslation] is used.
+sealed class Translation {
+  const Translation({required this.key});
 
   final TranslationKey key;
-  // Maps the locale to the actual translated text
+
+  /// Whether [locale] has any non-empty content for this key - for [PluralizedTranslation],
+  /// that means at least one plural form is filled in.
+  bool hasContentFor(TranslationLocale locale);
+
+  /// Combines this [Translation] with [other] for the same [key], e.g. when merging the data
+  /// parsed from different locale files for that key. If the two disagree on whether the key
+  /// is pluralized (e.g. one locale file was hand-edited to add `_one`/`_other` suffixes before
+  /// the others), the non-pluralized side is upgraded via [SimpleTranslation.pluralized] first,
+  /// so neither locale's data is silently dropped.
+  Translation mergedWith(Translation other);
+}
+
+class SimpleTranslation extends Translation {
+  SimpleTranslation({required super.key, this.translations = const IMap.empty()});
+
+  /// Maps the locale to the actual translated text.
   final IMap<TranslationLocale, String> translations;
 
-  Translation copyWith({IMap<TranslationLocale, String>? translations}) {
-    return Translation(key: key, translations: (translations ?? this.translations));
+  SimpleTranslation withUpdatedTranslation(TranslationLocale locale, String text) {
+    return SimpleTranslation(
+      key: key,
+      translations: translations.update(locale, (_) => text, ifAbsent: () => text),
+    );
   }
 
-  Translation withUpdatedTranslation(TranslationLocale locale, String text) {
-    return copyWith(translations: translations.update(locale, (_) => text, ifAbsent: () => text));
+  /// Converts this into a pluralized translation, moving each locale's existing plain value
+  /// into the [PluralCategory.other] form.
+  PluralizedTranslation pluralized() {
+    var pluralTranslations = const IMap<TranslationLocale, IMap<PluralCategory, String>>.empty();
+    for (final entry in translations.entries) {
+      pluralTranslations = pluralTranslations.add(
+        entry.key,
+        {PluralCategory.other: entry.value}.lock,
+      );
+    }
+    return PluralizedTranslation(key: key, pluralTranslations: pluralTranslations);
+  }
+
+  @override
+  bool hasContentFor(TranslationLocale locale) {
+    final value = translations[locale];
+    return value != null && value.trim().isNotEmpty;
+  }
+
+  @override
+  Translation mergedWith(Translation other) {
+    switch (other) {
+      case PluralizedTranslation():
+        return pluralized().mergedWith(other);
+      case SimpleTranslation(:final translations):
+        var mergedTranslations = this.translations;
+        for (final entry in translations.entries) {
+          mergedTranslations = mergedTranslations.add(entry.key, entry.value);
+        }
+        return SimpleTranslation(key: key, translations: mergedTranslations);
+    }
+  }
+}
+
+class PluralizedTranslation extends Translation {
+  PluralizedTranslation({required super.key, this.pluralTranslations = const IMap.empty()});
+
+  /// Maps the locale to its plural forms.
+  final IMap<TranslationLocale, IMap<PluralCategory, String>> pluralTranslations;
+
+  PluralizedTranslation withUpdatedPluralTranslation(
+    TranslationLocale locale,
+    PluralCategory category,
+    String text,
+  ) {
+    final formsForLocale = (pluralTranslations[locale] ?? const IMap.empty()).update(
+      category,
+      (_) => text,
+      ifAbsent: () => text,
+    );
+    return PluralizedTranslation(
+      key: key,
+      pluralTranslations: pluralTranslations.update(
+        locale,
+        (_) => formsForLocale,
+        ifAbsent: () => formsForLocale,
+      ),
+    );
+  }
+
+  /// Converts this into a non-pluralized translation, moving each locale's [PluralCategory.other]
+  /// value or, if that's empty, its first non-empty plural form into the plain value.
+  SimpleTranslation depluralized() {
+    var translations = const IMap<TranslationLocale, String>.empty();
+    for (final entry in pluralTranslations.entries) {
+      final forms = entry.value;
+      final other = forms[PluralCategory.other];
+      final value = (other != null && other.trim().isNotEmpty)
+          ? other
+          : forms.values.firstWhereOrNull((text) => text.trim().isNotEmpty) ?? '';
+      translations = translations.add(entry.key, value);
+    }
+    return SimpleTranslation(key: key, translations: translations);
+  }
+
+  @override
+  bool hasContentFor(TranslationLocale locale) {
+    final forms = pluralTranslations[locale];
+    return forms != null && forms.values.any((text) => text.trim().isNotEmpty);
+  }
+
+  @override
+  Translation mergedWith(Translation other) {
+    final PluralizedTranslation otherPluralized = switch (other) {
+      PluralizedTranslation() => other,
+      SimpleTranslation() => other.pluralized(),
+    };
+
+    var merged = pluralTranslations;
+    for (final entry in otherPluralized.pluralTranslations.entries) {
+      merged = merged.add(entry.key, entry.value);
+    }
+    return PluralizedTranslation(key: key, pluralTranslations: merged);
   }
 }
 
@@ -94,55 +230,60 @@ class LocalizationProject {
     return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
   }
 
-  static LocalizationProject parseTranslationJson({
-    required Map<String, dynamic> json,
-    required TranslationLocale locale,
-    LocalizationProject? existingProject,
-  }) {
-    // Start with existing data or empty collections
-    IMap<TranslationKey, Translation> translations =
-        existingProject?.translations ?? const IMap<TranslationKey, Translation>.empty();
-    ISet<TranslationLocale> languages = (existingProject?.languages ?? ISet<TranslationLocale>())
-        .add(locale);
+  /// Flattens nested JSON objects into dot-separated [TranslationKey]s, oblivious to
+  /// pluralization.
+  static IMap<TranslationKey, String> _flattenJson(Map<String, dynamic> json) {
+    final Map<TranslationKey, String> flat = {};
 
     void recurse(Map<String, dynamic> data, List<String> path) {
       data.forEach((key, value) {
         final currentPath = [...path, key];
 
         if (value is Map<String, dynamic>) {
-          // Continue nesting
           recurse(value, currentPath);
         } else if (value is String) {
-          // We found a leaf node (a translation)
-          final translationKey = TranslationKey(currentPath.toIList());
-
-          final existingTranslation = translations[translationKey];
-
-          if (existingTranslation != null) {
-            // Key exists, add this language to it
-            final updatedMap = existingTranslation.translations.add(locale, value);
-            translations = translations.add(
-              translationKey,
-              existingTranslation.copyWith(translations: updatedMap),
-            );
-          } else {
-            // New key discovered
-            translations = translations.add(
-              translationKey,
-              Translation(key: translationKey, translations: {locale: value}.lock),
-            );
-          }
+          flat[TranslationKey(currentPath.toIList())] = value;
         }
       });
     }
 
     recurse(json, []);
+    return flat.lock;
+  }
+
+  static LocalizationProject parseTranslationJson({
+    required Map<String, dynamic> json,
+    required TranslationLocale locale,
+    LocalizationProject? existingProject,
+    PluralizationStrategy pluralizationStrategy = const ReactI18nextPluralizationStrategy(),
+  }) {
+    final flatValues = _flattenJson(json);
+    final localeTranslations = pluralizationStrategy.applyTo(flatValues, locale);
+
+    // Start with existing data or empty collections
+    IMap<TranslationKey, Translation> translations =
+        existingProject?.translations ?? const IMap<TranslationKey, Translation>.empty();
+    ISet<TranslationLocale> languages = (existingProject?.languages ?? ISet<TranslationLocale>())
+        .add(locale);
+
+    for (final entry in localeTranslations.entries) {
+      translations = translations.update(
+        entry.key,
+        (existingTranslation) => existingTranslation.mergedWith(entry.value),
+        ifAbsent: () => entry.value,
+      );
+    }
+
     return LocalizationProject(translations: translations, languages: languages);
   }
 }
 
 extension LocalizationExporter on LocalizationProject {
-  String toJsonString(TranslationLocale locale, {bool sortByAlphabet = false}) {
+  String toJsonString(
+    TranslationLocale locale, {
+    bool sortByAlphabet = false,
+    PluralizationStrategy pluralizationStrategy = const ReactI18nextPluralizationStrategy(),
+  }) {
     // Get the keys in the desired order
     Iterable<TranslationKey> sortedKeys = translations.keys;
     if (sortByAlphabet) {
@@ -156,12 +297,13 @@ extension LocalizationExporter on LocalizationProject {
 
     for (final translationKey in sortedKeys) {
       final translation = translations[translationKey];
-      final value = translation?.translations[locale];
+      if (translation == null) continue;
 
-      // Skip if this specific language doesn't have a value for this key or it's empty
-      if (value == null || value.trim().isEmpty) continue;
-
-      _assignNested(root, translationKey.keyParts, value, sortByAlphabet);
+      // Delegates to the pluralization strategy so plural forms are turned back into their
+      // flat, suffixed keys (e.g. "testSuites_one") - skipping empty values/forms.
+      for (final flatEntry in pluralizationStrategy.flatten(translation, locale).entries) {
+        _assignNested(root, flatEntry.key.keyParts, flatEntry.value, sortByAlphabet);
+      }
     }
 
     // Use JsonEncoder.withIndent for a clean, human-readable file
@@ -239,7 +381,9 @@ extension LocalizationTree on LocalizationProject {
     final lowerQuery = query.trim().toLowerCase();
 
     for (final translationKey in translations.keys) {
-      if (lowerQuery.isNotEmpty && !translationKey.key.toLowerCase().contains(lowerQuery)) continue;
+      if (lowerQuery.isNotEmpty && !translationKey.key.toLowerCase().contains(lowerQuery)) {
+        continue;
+      }
       Map<String, dynamic> current = structure;
       final parts = translationKey.keyParts;
 
@@ -273,15 +417,16 @@ extension LocalizationTree on LocalizationProject {
       if (entry.value is TranslationKey) {
         // leaf node
         final key = entry.value as TranslationKey;
-        final translationMap = translations[key]?.translations;
+        final translation = translations[key];
 
-        final countTranslationsWithContent =
-            translationMap?.values.where((text) => text.trim().isNotEmpty).length ?? 0;
+        final countLanguagesWithContent = translation == null
+            ? 0
+            : languages.where((locale) => translation.hasContentFor(locale)).length;
 
         return TreeViewNode<TranslationKeyTreeNode>(
           TranslationKeyTreeNode(
             translationKey: key,
-            hasAllKeys: countTranslationsWithContent == languages.length,
+            hasAllKeys: countLanguagesWithContent == languages.length,
           ),
         );
       } else {
