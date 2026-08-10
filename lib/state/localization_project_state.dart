@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../constants.dart';
 import '../model/pluralization_strategy.dart';
 import '../model/translation.dart';
+import 'selected_translation_key.dart';
 
 part 'localization_project_state.g.dart';
 
@@ -167,13 +168,15 @@ class TranslationKeysAdding extends _$TranslationKeysAdding {
       return;
     }
 
+    // Strip the "LOCALIZATOR_ADDING_KEY" placeholder that the virtual tree node embeds in
+    // newTranslationKey's parts, so it never ends up in the stored Translation's own key.
+    final key = TranslationKey(
+      newTranslationKey.keyParts.where((p) => p != Constants.addingKey).toIList(),
+    );
+
     ref
         .read(localizationProjectStateProvider.notifier)
-        .updateTranslation(
-          TranslationKey(
-            newTranslationKey.keyParts.where((p) => p != Constants.addingKey).toIList(),
-          ),
-          SimpleTranslation(key: newTranslationKey),
-        );
+        .updateTranslation(key, SimpleTranslation(key: key));
+    ref.read(selectedTranslationKeyProvider.notifier).set(key);
   }
 }

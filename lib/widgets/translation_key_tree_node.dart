@@ -136,8 +136,14 @@ class _TranslationKeyTreeNodeWidgetState extends State<TranslationKeyTreeNodeWid
                           onTap: () => isLeafNode
                               ? widget.onSelectTranslationKey(node.content.translationKey)
                               : treeViewController.toggleNode(node),
-                          onSecondaryTap: () {
-                            showAddNewKeyDialog(context, parent: node.content.translationKey);
+                          onSecondaryTap: () async {
+                            final addedKey = await showAddNewKeyDialog(
+                              context,
+                              parent: node.content.translationKey,
+                            );
+                            if (addedKey != null) {
+                              widget.onSelectTranslationKey(addedKey);
+                            }
                           },
                           child: Builder(
                             builder: (context) {

@@ -108,13 +108,15 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
               spacing: 8,
               children: [
                 Flexible(
-                  child: SelectableText(
-                    widget.translationKey.key,
-                    style: const TextStyle(fontSize: 18, fontWeight: .w500),
-                    maxLines: 2,
+                  child: Align(
+                    alignment: .centerStart,
+                    child: SelectableText(
+                      widget.translationKey.key,
+                      style: const TextStyle(fontSize: 18, fontWeight: .w500),
+                      maxLines: 2,
+                    ),
                   ),
                 ),
-
                 Button.secondary(
                   onPressed: isPluralized ? _handleDepluralize : _handlePluralize,
                   child: Text(isPluralized ? "Depluralisieren" : "Pluralisieren"),
