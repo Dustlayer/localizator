@@ -2,5 +2,13 @@
   "greeting": "Grüß Gott",
   "menu_de": {
     "title": "Titel des Menüs"
+  },
+  "settings": {
+    "account": {
+      "name": "Name",
+      "email": "E-Mail"
+    },
+    "profile": "Profil",
+    "notifications": "Benachrichtigungen"
   }
 }

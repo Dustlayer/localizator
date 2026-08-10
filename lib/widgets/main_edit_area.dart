@@ -1,5 +1,6 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:localizator/dialogs/rename_key_dialog.dart';
 import 'package:localizator/model/translation.dart';
 import 'package:localizator/state/selected_translation_key.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
@@ -72,6 +73,11 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
         .updateTranslation(widget.translationKey, translation.depluralized());
   }
 
+  void _handleMove() {
+    // The editor only ever shows a leaf's content, so this is never a folder move
+    showRenameKeyDialog(context, translationKey: widget.translationKey, isFolder: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final locales = widget.localizationProject.languages;
@@ -117,6 +123,7 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
                     ),
                   ),
                 ),
+                IconButton.secondary(onPressed: _handleMove, icon: Icon(LucideIcons.move)),
                 Button.secondary(
                   onPressed: isPluralized ? _handleDepluralize : _handlePluralize,
                   child: Text(isPluralized ? "Depluralisieren" : "Pluralisieren"),

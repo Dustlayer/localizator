@@ -1,6 +1,7 @@
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/services.dart';
 import 'package:localizator/dialogs/add_new_key_dialog.dart';
+import 'package:localizator/dialogs/rename_key_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TreeView;
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
@@ -180,12 +181,27 @@ class _TranslationKeyTreeNodeWidgetState extends State<TranslationKeyTreeNodeWid
                   child: IconButton.ghost(
                     alignment: .center,
                     size: .small,
+                    icon: const Icon(LucideIcons.move),
+                    onPressed: () => showRenameKeyDialog(
+                      context,
+                      translationKey: node.content.translationKey,
+                      isFolder: node.children.isNotEmpty,
+                    ),
+                  ),
+                ).withPadding(left: 24),
+
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: _isHovered ? 1 : 0,
+                  child: IconButton.ghost(
+                    alignment: .center,
+                    size: .small,
                     icon: const Icon(Icons.remove),
                     onPressed: () {
                       widget.onDeleteTranslationKey(node);
                     },
                   ),
-                ).withPadding(left: 24),
+                ).withPadding(left: 8),
 
                 if (!isLeafNode)
                   AnimatedOpacity(

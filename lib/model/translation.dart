@@ -22,6 +22,10 @@ class TranslationKey {
       TranslationKey(keyParts.sublist(0, math.max(0, keyParts.length - 1)));
   bool get hasParent => keyParts.isNotEmpty;
 
+  /// Whether this key lies within the subtree rooted at [other]. i.e. [other] is a strict,
+  /// dot-bounded prefix of this key (so `foobar` is not considered a descendant of `foo`).
+  bool isDescendantOf(TranslationKey other) => key.startsWith('${other.key}.');
+
   factory TranslationKey.fromKey(String key) {
     return TranslationKey(key.split('.').toIList());
   }
@@ -81,6 +85,10 @@ sealed class Translation {
   /// the others), the non-pluralized side is upgraded via [SimpleTranslation.pluralized] first,
   /// so neither locale's data is silently dropped.
   Translation mergedWith(Translation other);
+
+  /// A copy of this translation under [newKey] instead - used when renaming/moving a key via
+  /// [LocalizationKeyRenaming.withRenamedKey].
+  Translation withKey(TranslationKey newKey);
 }
 
 class SimpleTranslation extends Translation {
@@ -114,6 +122,10 @@ class SimpleTranslation extends Translation {
     final value = translations[locale];
     return value != null && value.trim().isNotEmpty;
   }
+
+  @override
+  SimpleTranslation withKey(TranslationKey newKey) =>
+      SimpleTranslation(key: newKey, translations: translations);
 
   @override
   Translation mergedWith(Translation other) {
@@ -176,6 +188,10 @@ class PluralizedTranslation extends Translation {
     final forms = pluralTranslations[locale];
     return forms != null && forms.values.any((text) => text.trim().isNotEmpty);
   }
+
+  @override
+  PluralizedTranslation withKey(TranslationKey newKey) =>
+      PluralizedTranslation(key: newKey, pluralTranslations: pluralTranslations);
 
   @override
   Translation mergedWith(Translation other) {
@@ -275,6 +291,80 @@ class LocalizationProject {
     }
 
     return LocalizationProject(translations: translations, languages: languages);
+  }
+}
+
+/// Maps [key], which must be [oldKey] itself or lie within its subtree, onto its new location
+/// once the subtree rooted at [oldKey] is renamed/moved to [newKey].
+TranslationKey movedTranslationKey(
+  TranslationKey key, {
+  required TranslationKey oldKey,
+  required TranslationKey newKey,
+}) {
+  if (key == oldKey) return newKey;
+  return TranslationKey(newKey.keyParts.addAll(key.keyParts.sublist(oldKey.depth)));
+}
+
+extension LocalizationKeyRenaming on LocalizationProject {
+  /// [oldKey] itself, plus any descendant keys. I.e. everything that would move if the
+  /// subtree rooted at it (its whole "folder", if it has children) were renamed.
+  Set<TranslationKey> keysRootedAt(TranslationKey oldKey) =>
+      translations.keys.where((key) => key == oldKey || key.isDescendantOf(oldKey)).toSet();
+
+  /// Whether [key] has other, untouched (not in [excluding]) descendant keys. So whether
+  /// it's a "folder" once the keys in [excluding] are taken out of the picture.
+  bool _hasOtherDescendants(TranslationKey key, Set<TranslationKey> excluding) =>
+      translations.keys.any((k) => !excluding.contains(k) && k.isDescendantOf(key));
+
+  /// A validation error message if renaming/moving [oldKey] to [newKey] isn't possible (an
+  /// empty key, no actual change). `null` if the rename is valid.
+  ///
+  /// Landing exactly on an existing *plain* key is blocked. That would silently overwrite its
+  /// translation with no way back. Landing on an existing *folder* (a key that still has other
+  /// descendants once the moved ones are excluded) is allowed instead, see
+  /// [renameWouldMergeFolders], which flags that case for the UI to warn about separately, since
+  /// it merges/overwrites rather than blocks outright.
+  String? validateKeyRename({required TranslationKey oldKey, required TranslationKey newKey}) {
+    if (newKey.keyParts.isEmpty || newKey.keyParts.any((part) => part.trim().isEmpty)) {
+      return "Schlüssel darf nicht leer sein.";
+    }
+    if (newKey.key == oldKey.key) {
+      return "Neuer Schlüssel entspricht dem aktuellen.";
+    }
+
+    final movedKeys = keysRootedAt(oldKey);
+    for (final key in movedKeys) {
+      final target = movedTranslationKey(key, oldKey: oldKey, newKey: newKey);
+      final collides = !movedKeys.contains(target) && translations.containsKey(target);
+      if (collides && !_hasOtherDescendants(target, movedKeys)) {
+        return "Schlüssel '${target.key}' existiert bereits.";
+      }
+    }
+    return null;
+  }
+
+  /// Whether renaming/moving [oldKey] to [newKey] would land on a folder that already exists
+  /// there. i.e. keys other than the ones being moved already live under [newKey]. Landing on
+  /// a plain, childless key instead is a different matter, already blocked as an error by
+  /// [validateKeyRename]. This is purely informational for the UI.
+  bool renameWouldMergeFolders({required TranslationKey oldKey, required TranslationKey newKey}) =>
+      _hasOtherDescendants(newKey, keysRootedAt(oldKey));
+
+  /// Renames/moves [oldKey] to [newKey], carrying along its whole subtree (all descendant keys
+  /// and their translations, if it's a "folder"). Callers should check [validateKeyRename]
+  /// first - this doesn't re-validate.
+  LocalizationProject withRenamedKey({
+    required TranslationKey oldKey,
+    required TranslationKey newKey,
+  }) {
+    var newTranslations = translations;
+    for (final key in keysRootedAt(oldKey)) {
+      final translation = translations[key];
+      if (translation == null) continue;
+      final target = movedTranslationKey(key, oldKey: oldKey, newKey: newKey);
+      newTranslations = newTranslations.remove(key).add(target, translation.withKey(target));
+    }
+    return LocalizationProject(translations: newTranslations, languages: languages, isDirty: true);
   }
 }
 

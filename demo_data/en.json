@@ -2,5 +2,15 @@
   "greeting": "Greetings",
   "menu_en": {
     "title": "Menu title"
+  },
+  "settings": {
+    "account": {
+      "name": "Name",
+      "email": "Email"
+    },
+    "profile": {
+      "bio": "Bio"
+    },
+    "notifications": "Notifications"
   }
 }

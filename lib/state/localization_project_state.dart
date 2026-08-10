@@ -90,6 +90,31 @@ class LocalizationProjectState extends _$LocalizationProjectState {
     state = AsyncData(localizationProject.withTranslation(key: key, translation: translation));
   }
 
+  /// Renames/moves [oldKey] to [newKey], carrying along its whole subtree if it's a "folder".
+  /// Callers should check [LocalizationKeyRenaming.validateKeyRename] first.
+  ///
+  /// Also updates the selection: renaming a single (leaf) key always selects the result, same
+  /// as picking a newly-added key. A folder isn't itself selectable for editing though, so
+  /// moving one only carries the selection along if it was already pointed at a key inside the
+  /// moved subtree. Otherwise it's left untouched.
+  void renameTranslationKey(TranslationKey oldKey, TranslationKey newKey) {
+    final localizationProject = state.value;
+    if (localizationProject == null) return;
+
+    final isFolder = !localizationProject.translations.containsKey(oldKey);
+    final movedKeys = localizationProject.keysRootedAt(oldKey);
+    state = AsyncData(localizationProject.withRenamedKey(oldKey: oldKey, newKey: newKey));
+
+    final selectedKey = ref.read(selectedTranslationKeyProvider);
+    if (!isFolder) {
+      ref.read(selectedTranslationKeyProvider.notifier).set(newKey);
+    } else if (selectedKey != null && movedKeys.contains(selectedKey)) {
+      ref
+          .read(selectedTranslationKeyProvider.notifier)
+          .set(movedTranslationKey(selectedKey, oldKey: oldKey, newKey: newKey));
+    }
+  }
+
   void removeTranslation(TranslationKey key) {
     final localizationProject = state.value;
     if (localizationProject == null) return;
