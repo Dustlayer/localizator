@@ -139,6 +139,8 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
                           ),
                           label: Text(category.label),
                           child: TextField(
+                            autofocus:
+                                locale == locales.first && category == PluralCategory.values.first,
                             initialValue: forms[category],
                             onChanged: (value) {
                               ref
@@ -165,6 +167,7 @@ class __TranslationsEditorState extends ConsumerState<_TranslationsEditor> {
                   key: InputKey("${widget.translationKey.key}-${locale.locale}-$reloadGeneration"),
                   label: Text(locale.name),
                   child: TextField(
+                    autofocus: locale == locales.first,
                     initialValue: translatedText,
                     onChanged: (value) {
                       ref

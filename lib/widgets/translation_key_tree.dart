@@ -66,44 +66,51 @@ class _TranslationKeyTreeState extends ConsumerState<TranslationKeyTree> {
     return TopBar(
       child: Row(
         children: [
-          SizedBox(
-            width: 250,
-            child: Column(
-              children: [
-                SizedBox(height: 100, child: _ProjectFileList(project: appConfig?.lastUsedProject)),
-                const Divider(),
-                _KeySearchBar(
-                  queryTextController: _queryTextController,
-                  onExpandAll: () async {
-                    await ref
-                        .read(expandedTranslationKeysProvider.notifier)
-                        .expandAllKnownKeys();
-                    _treeController.expandAll();
-                  },
-                  onCollapseAll: () {
-                    ref.read(expandedTranslationKeysProvider.notifier).collapseAll();
-                    _jumpScrollToTop();
-                    _treeController.collapseAll();
-                  },
-                ).withPadding(all: 6),
-                appConfig?.lastUsedProject == null
-                    ? const Expanded(
-                        child: Center(
-                          child: Text("Kein Projekt ausgewählt", maxLines: 2, overflow: .ellipsis),
+          FocusTraversalGroup(
+            child: SizedBox(
+              width: 250,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 100,
+                    child: _ProjectFileList(project: appConfig?.lastUsedProject),
+                  ),
+                  const Divider(),
+                  _KeySearchBar(
+                    queryTextController: _queryTextController,
+                    onExpandAll: () async {
+                      await ref.read(expandedTranslationKeysProvider.notifier).expandAllKnownKeys();
+                      _treeController.expandAll();
+                    },
+                    onCollapseAll: () {
+                      ref.read(expandedTranslationKeysProvider.notifier).collapseAll();
+                      _jumpScrollToTop();
+                      _treeController.collapseAll();
+                    },
+                  ).withPadding(all: 6),
+                  appConfig?.lastUsedProject == null
+                      ? const Expanded(
+                          child: Center(
+                            child: Text(
+                              "Kein Projekt ausgewählt",
+                              maxLines: 2,
+                              overflow: .ellipsis,
+                            ),
+                          ),
+                        )
+                      : Expanded(
+                          child: TranslationKeyTreeView(
+                            treeController: _treeController,
+                            verticalController: _verticalController,
+                            horizontalController: _horizontalController,
+                          ),
                         ),
-                      )
-                    : Expanded(
-                        child: TranslationKeyTreeView(
-                          treeController: _treeController,
-                          verticalController: _verticalController,
-                          horizontalController: _horizontalController,
-                        ),
-                      ),
-              ],
+                ],
+              ),
             ),
           ),
           const VerticalDivider(),
-          Expanded(child: MainEditArea()),
+          Expanded(child: FocusTraversalGroup(child: MainEditArea())),
         ],
       ),
     );
@@ -158,10 +165,7 @@ class _KeySearchBar extends ConsumerWidget {
         ),
         Tooltip(
           tooltip: (context) => TooltipContainer(child: const Text("Alle ausklappen")),
-          child: IconButton.outline(
-            icon: const Icon(LucideIcons.expand),
-            onPressed: onExpandAll,
-          ),
+          child: IconButton.outline(icon: const Icon(LucideIcons.expand), onPressed: onExpandAll),
         ),
         Tooltip(
           tooltip: (context) => TooltipContainer(child: const Text("Alle einklappen")),

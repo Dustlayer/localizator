@@ -107,6 +107,7 @@ class _TranslationKeyTreeNodeWidgetState extends State<TranslationKeyTreeNodeWid
                               },
                             },
                             child: TextField(
+                              autofocus: true,
                               controller: _controller,
                               placeholder: const Text("ordner.key"),
                               features: [
